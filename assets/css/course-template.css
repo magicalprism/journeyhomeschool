@@ -1,0 +1,722 @@
+/**
+ * Course Template styles.
+ *
+ * This stylesheet is enqueued only for pages assigned to the
+ * "Course Template" in WordPress. It intentionally avoids Divi builder
+ * layout classes so course lessons can stay lightweight while still using
+ * Gutenberg content and AccessAlly blocks/shortcodes.
+ */
+
+.jha-course-template {
+	background: #fff;
+	min-height: calc(100vh - var(--jha-site-header-height, 80px) - var(--jha-site-footer-height, 0px));
+	padding: 0;
+}
+
+body.et_fixed_nav.et_show_nav:not(.et_transparent_nav):not(.et-tb):not(.et-tb-has-header) #page-container {
+	padding-top: var(--jha-site-header-height, 80px);
+}
+
+body.et_fixed_nav.et_show_nav.et_secondary_nav_enabled:not(.et_transparent_nav):not(.et-tb):not(.et-tb-has-header) #page-container {
+	padding-top: var(--jha-site-header-height, 111px);
+}
+
+.jha-course-layout {
+	display: grid;
+	grid-template-columns: 220px minmax(0, 1fr);
+	gap: 42px;
+	width: 80%;
+	min-height: inherit;
+	max-width: 1080px;
+	margin: 0 auto;
+	padding-top: 0;
+}
+
+.jha-course-sidebar {
+	box-sizing: border-box;
+	width: 100%;
+	align-self: stretch;
+	border-right: 1px solid #aeb7c4;
+	border-left: 1px solid #aeb7c4;
+	background: #f1f2f4;
+}
+
+/* The logo comes from ACF course_sidebar_logo first, then the course featured image. */
+.jha-course-logo {
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	aspect-ratio: 1 / 1;
+	margin: 0 auto;
+	padding: 1.5rem;
+	text-align: center;
+}
+
+.jha-course-logo a {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 100%;
+}
+
+.jha-course-logo-image {
+	display: block;
+	width: 100%;
+	max-width: 100%;
+	max-height: 100%;
+	margin: 0 auto;
+	object-fit: contain;
+}
+
+/* Menu items are generated from the top-level course page and its child pages. */
+.jha-course-menu,
+.jha-course-submenu {
+	padding: 0;
+	margin: 0;
+	list-style: none;
+}
+
+.jha-course-menu-item {
+	position: relative;
+	margin: 0;
+}
+
+.jha-course-mobile-menu-toggle {
+	display: none;
+}
+
+.jha-course-menu-link {
+	position: relative;
+	display: block;
+	padding: 16px 34px 16px 20px;
+	border-top: 1px solid #2f4867;
+	background: #f1f2f4;
+	color: #2f4867;
+	font-family: "sinkin_sans600_semibold", Arial, sans-serif;
+	font-size: 0.65rem;
+	font-weight: 600;
+	line-height: 1.3;
+	text-decoration: none;
+	text-transform: uppercase;
+	letter-spacing: 0.01em;
+	transition: background-color 160ms ease, color 160ms ease;
+}
+
+.jha-course-menu-item.has-children:not(.jha-course-parent-item) > .jha-course-menu-link {
+	padding-right: 44px;
+}
+
+.jha-course-menu-link:hover,
+.jha-course-menu-link:focus {
+	background: #2f4867;
+	color: #fff;
+	text-decoration: none;
+}
+
+.jha-course-menu-item.is-active > .jha-course-menu-link {
+	background: #2f4867;
+	color: #fff;
+}
+
+.jha-course-menu-item.is-active > .jha-course-menu-link:hover,
+.jha-course-menu-item.is-active > .jha-course-menu-link:focus {
+	background: #263b56;
+	color: #fff;
+}
+
+/* Lesson pages with nested child pages use this button as a lightweight accordion toggle. */
+.jha-course-submenu-toggle {
+	position: absolute;
+	top: 0;
+	right: 0;
+	z-index: 2;
+	width: 36px;
+	height: 49px;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: #2f4867;
+	cursor: pointer;
+}
+
+.jha-course-submenu-toggle::after {
+	position: absolute;
+	top: 50%;
+	right: 15px;
+	width: 7px;
+	height: 7px;
+	border-right: 1px solid currentColor;
+	border-bottom: 1px solid currentColor;
+	content: "";
+	transform: translateY(-50%) rotate(45deg);
+}
+
+.jha-course-submenu-toggle .screen-reader-text {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.jha-course-menu-item.is-expanded > .jha-course-submenu-toggle::after {
+	transform: translateY(-50%) rotate(225deg);
+}
+
+.jha-course-menu-item.is-active > .jha-course-submenu-toggle {
+	color: #fff;
+}
+
+.jha-course-submenu {
+	display: none;
+}
+
+.jha-course-menu-item.is-expanded > .jha-course-submenu {
+	display: block;
+}
+
+.jha-course-submenu .jha-course-menu-link {
+	padding-left: 34px;
+	background: #fafafa;
+	font-size: 0.6rem;
+}
+
+.jha-course-menu-item.is-expanded > .jha-course-menu-link,
+.jha-course-menu-item.is-expanded > .jha-course-submenu .jha-course-menu-link {
+	background: #9cb1ce;
+	color: #fff;
+}
+
+.jha-course-menu-item.is-expanded > .jha-course-submenu-toggle {
+	color: #fff;
+}
+
+.jha-course-menu-item.is-expanded > .jha-course-menu-link:hover,
+.jha-course-menu-item.is-expanded > .jha-course-menu-link:focus,
+.jha-course-menu-item.is-expanded > .jha-course-submenu .jha-course-menu-link:hover,
+.jha-course-menu-item.is-expanded > .jha-course-submenu .jha-course-menu-link:focus {
+	background: #2f4867;
+	color: #fff;
+}
+
+.jha-course-submenu .jha-course-submenu .jha-course-menu-link {
+	padding-left: 48px;
+}
+
+.jha-course-progress-tracker {
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	aspect-ratio: 1 / 1;
+	padding: 1.5rem;
+	border-top: 1px solid #2f4867;
+	color: #2f4867;
+	text-align: center;
+}
+
+.jha-course-progress-ring {
+	display: grid;
+	width: min(140px, 100%);
+	aspect-ratio: 1 / 1;
+	place-items: center;
+	border-radius: 50%;
+	background:
+		radial-gradient(closest-side, #f1f2f4 72%, transparent 73%),
+		conic-gradient(#43a8a3 var(--jha-course-progress-percent, 0%), #dcdcde 0);
+	color: #2f4867;
+	font-family: "sinkin_sans600_semibold", Arial, sans-serif;
+	font-size: 1rem;
+	font-weight: 600;
+	line-height: 1;
+}
+
+.jha-course-main {
+	box-sizing: border-box;
+	display: flex;
+	width: 100%;
+	min-width: 0;
+	padding: 4rem 2rem;
+	color: #222;
+}
+
+.jha-course-content {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+	font-size: 16px;
+	line-height: 1.6;
+}
+
+.jha-course-title {
+	margin: 0;
+	color: #2f4867;
+	font-size: 2.5rem;
+}
+
+/* Default Gutenberg H1 styling; editor-selected colors and sizes still win. */
+.jha-course-content h1:not(.has-text-color):not([style*="color"]) {
+	color: #2f4867;
+}
+
+.jha-course-content h1:not([class*="font-size"]):not([style*="font-size"]) {
+	font-size: 2.5rem;
+}
+
+.jha-course-content > *:first-child {
+	margin-top: 0;
+}
+
+/* Admins can adjust this per page from Course Menu Settings. */
+.jha-course-content > * + * {
+	margin-top: var(--jha-course-block-gap, 3rem);
+	margin-bottom: 0;
+}
+
+.jha-course-content a {
+	color: #2f4867;
+}
+
+.jha-course-content ul,
+.jha-course-content ol {
+	padding-left: 1.5em;
+	margin-left: 0;
+	list-style-position: outside;
+}
+
+.jha-course-content ul,
+.jha-course-content ul.wp-block-list {
+	list-style-type: disc;
+}
+
+.jha-course-content ol,
+.jha-course-content ol.wp-block-list {
+	list-style-type: decimal;
+}
+
+.jha-course-content li + li {
+	margin-top: 0.35em;
+}
+
+.jha-course-content input[type="radio"] {
+	margin-top: 0;
+	vertical-align: middle;
+}
+
+.jha-course-content label input[type="radio"],
+.jha-course-content [class*="accessally"] input[type="radio"],
+.jha-course-content [class*="progressally"] input[type="radio"] {
+	position: relative;
+	top: -4px;
+}
+
+.jha-course-content .progressally-quiz-choice-input[type="radio"] {
+	top: -4px;
+}
+
+.jha-course-content input[type="checkbox"],
+.jha-course-content input[type="radio"] {
+	accent-color: #43a8a3;
+}
+
+.jha-course-content .objective-table {
+	--jha-progressally-objective-color: #2f4867;
+	--jha-progressally-objective-gap: 0;
+	border-collapse: separate !important;
+	border-spacing: 0 var(--jha-progressally-objective-gap) !important;
+}
+
+.jha-course-content table.objective-table {
+	padding: 0 !important;
+}
+
+.jha-course-content .objective-table tr,
+.jha-course-content .objective-table .progressally-flex-row {
+	align-items: center !important;
+	border: 1px solid #eeeeee !important;
+}
+
+.jha-course-content .objective-table tr > td {
+	padding: 8px 10px !important;
+	border-top: 1px solid #eeeeee !important;
+	border-bottom: 1px solid #eeeeee !important;
+	vertical-align: middle !important;
+}
+
+.jha-course-content .objective-table tr > td:first-child {
+	border-left: 1px solid #eeeeee !important;
+}
+
+.jha-course-content .objective-table tr > td:last-child {
+	border-right: 1px solid #eeeeee !important;
+}
+
+.jha-course-content .objective-table tr:first-child > td:first-child,
+.jha-course-content .objective-table .progressally-flex-row:first-child {
+	border-top-left-radius: 6px !important;
+}
+
+.jha-course-content .objective-table tr:first-child > td:last-child,
+.jha-course-content .objective-table .progressally-flex-row:first-child {
+	border-top-right-radius: 6px !important;
+}
+
+.jha-course-content .objective-table tr:last-child > td:first-child,
+.jha-course-content .objective-table .progressally-flex-row:last-child {
+	border-bottom-left-radius: 6px !important;
+}
+
+.jha-course-content .objective-table tr:last-child > td:last-child,
+.jha-course-content .objective-table .progressally-flex-row:last-child {
+	border-bottom-right-radius: 6px !important;
+}
+
+.jha-course-content div.objective-table .progressally-flex-row + .progressally-flex-row {
+	margin-top: var(--jha-progressally-objective-gap) !important;
+}
+
+.jha-course-content div.objective-table .progressally-flex-row {
+	padding: 8px 10px !important;
+}
+
+.jha-course-content .objective-table .progressally-flex-cell {
+	align-items: center !important;
+}
+
+.jha-course-content .objective-table .objective-number {
+	width: 48px !important;
+	min-width: 48px !important;
+	flex: 0 0 48px !important;
+	align-items: flex-start !important;
+	padding: 10px 10px 6px !important;
+	vertical-align: top !important;
+}
+
+.jha-course-content .objective-table .objective-description {
+	padding: 8px 10px !important;
+	line-height: 24px !important;
+	vertical-align: middle !important;
+}
+
+.jha-course-content .objective-table .objective-completion {
+	width: 24px !important;
+	min-width: 24px !important;
+	flex: 0 0 24px !important;
+	align-items: flex-start !important;
+	justify-content: flex-end !important;
+	padding: 10px 10px 6px !important;
+	text-align: right !important;
+	vertical-align: top !important;
+}
+
+.jha-course-content .objective-table .pa-objective-circle {
+	box-sizing: border-box !important;
+	display: inline-block !important;
+	flex: 0 0 28px !important;
+	aspect-ratio: 1 / 1 !important;
+	width: 28px !important;
+	height: 28px !important;
+	min-width: 28px !important;
+	min-height: 28px !important;
+	padding: 0 !important;
+	border-color: var(--jha-progressally-objective-color, #2f4867) !important;
+	border-radius: 999px !important;
+	background-color: var(--jha-progressally-objective-color, #2f4867) !important;
+	color: #fff !important;
+	font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif !important;
+	font-size: 13px !important;
+	font-style: normal !important;
+	font-weight: 700 !important;
+	letter-spacing: 0 !important;
+	line-height: 28px !important;
+	text-align: center !important;
+	text-indent: 1px !important;
+}
+
+.jha-course-template .objective-table input[type="checkbox"].completion-checkbox,
+.jha-course-template .objective-table .objective-completion .completion-checkbox,
+.jha-course-content .objective-table input[type="checkbox"].completion-checkbox,
+.jha-course-content .objective-table .completion-checkbox {
+	position: absolute !important;
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+	margin: 0 !important;
+	opacity: 0 !important;
+	appearance: none !important;
+	-webkit-appearance: none !important;
+}
+
+.jha-course-template .objective-table input[type="checkbox"].completion-checkbox + label.progressally-space-click,
+.jha-course-template .objective-table .objective-completion .completion-checkbox + label,
+.jha-course-content .objective-table input[type="checkbox"].completion-checkbox + label.progressally-space-click,
+.jha-course-content .objective-table .completion-checkbox + label,
+.jha-course-content [class*="progressally"] [class*="objective"] [class*="check"],
+.jha-course-content [class*="progressally"] [class*="objective"] [class*="complete"],
+.jha-course-content [class*="accessally"] [class*="objective"] [class*="check"],
+.jha-course-content [class*="accessally"] [class*="objective"] [class*="complete"] {
+	box-sizing: border-box !important;
+	position: relative !important;
+	top: auto !important;
+	display: inline-grid !important;
+	align-items: center !important;
+	justify-content: center !important;
+	place-items: center !important;
+	width: 24px !important;
+	height: 24px !important;
+	padding: 2px !important;
+	margin: 0 !important;
+	border-color: #eeeeee !important;
+	border-radius: 3px !important;
+	background: #eeeeee !important;
+	background-color: #eeeeee !important;
+	background-image: none !important;
+	color: #fff !important;
+	line-height: 1 !important;
+	transform: none !important;
+}
+
+.jha-course-template .objective-table input[type="checkbox"].completion-checkbox:checked + label.progressally-space-click,
+.jha-course-template .objective-table .objective-completion .completion-checkbox:checked + label,
+.jha-course-content .objective-table input[type="checkbox"].completion-checkbox:checked + label.progressally-space-click,
+.jha-course-content .objective-table .completion-checkbox:checked + label {
+	border-color: var(--jha-progressally-objective-color, #2f4867) !important;
+	background: var(--jha-progressally-objective-color, #2f4867) !important;
+	background-color: var(--jha-progressally-objective-color, #2f4867) !important;
+	background-image: none !important;
+}
+
+.jha-course-template .objective-table input[type="checkbox"].completion-checkbox + label.progressally-space-click::before,
+.jha-course-content .objective-table input[type="checkbox"].completion-checkbox + label.progressally-space-click::before {
+	content: "" !important;
+	display: none !important;
+}
+
+.jha-course-template .objective-table input[type="checkbox"].completion-checkbox:checked + label.progressally-space-click::before,
+.jha-course-content .objective-table input[type="checkbox"].completion-checkbox:checked + label.progressally-space-click::before,
+.jha-course-template .objective-table .objective-completion .completion-checkbox:checked + label::before,
+.jha-course-content .objective-table .completion-checkbox:checked + label::before {
+	content: "" !important;
+	display: block !important;
+	position: absolute !important;
+	top: 50% !important;
+	left: 50% !important;
+	width: 5px !important;
+	height: 11px !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	border: 0 !important;
+	border-right: 2px solid #fff !important;
+	border-bottom: 2px solid #fff !important;
+	background: transparent !important;
+	color: #fff !important;
+	transform: translate(-50%, -58%) rotate(45deg) !important;
+	transform-origin: center !important;
+}
+
+.jha-course-template .objective-table input[type="checkbox"].completion-checkbox + label.progressally-space-click::after,
+.jha-course-content .objective-table input[type="checkbox"].completion-checkbox + label.progressally-space-click::after,
+.jha-course-template .objective-table .objective-completion .completion-checkbox + label::after,
+.jha-course-content .objective-table .completion-checkbox + label::after {
+	content: none !important;
+	display: none !important;
+}
+
+.jha-course-content [class*="progressally"] ol > li::marker,
+.jha-course-content [class*="accessally"] ol > li::marker {
+	color: #43a8a3;
+	font-weight: 700;
+}
+
+.jha-course-content img,
+.jha-course-content iframe,
+.jha-course-content video,
+.jha-course-content smartvideo {
+	max-width: 100%;
+}
+
+.jha-course-content video,
+.jha-course-content .wp-block-video video,
+.jha-course-content .wp-block-embed iframe {
+	border-radius: 20px;
+	overflow: hidden;
+}
+
+/*
+ * SmartVideo + flex layouts: the player reads container width at init.
+ * Without full width/min-width:0 on the wrapper, Swarmify initializes
+ * with a collapsed width and the video never renders (see SmartVideo's
+ * divi5-builder/styles/bundle.css for the same fix).
+ */
+.jha-course-content .wp-block-smartvideo-block-smartvideo-guten {
+	width: 100%;
+	min-width: 0;
+	border-radius: 20px;
+	overflow: hidden;
+}
+
+.jha-course-content smartvideo {
+	display: block;
+	max-width: 100%;
+}
+
+.jha-course-content smartvideo.swarm-fluid {
+	width: 100%;
+	height: auto;
+}
+
+@media (min-width: 768px) and (max-width: 1100px) {
+	.jha-course-layout {
+		gap: 0;
+		width: 100%;
+		max-width: none;
+	}
+
+	.jha-course-menu-link {
+		font-size: 0.72rem;
+	}
+
+	.jha-course-submenu .jha-course-menu-link {
+		font-size: 0.66rem;
+	}
+
+	.jha-course-submenu-toggle {
+		height: 51px;
+	}
+}
+
+@media (max-width: 767px) {
+	.jha-course-template {
+		overflow-x: clip;
+		padding: 0;
+	}
+
+	.jha-course-layout {
+		display: block;
+		width: 100%;
+		max-width: none;
+	}
+
+	.jha-course-sidebar {
+		margin-bottom: 32px;
+	}
+
+	.jha-course-logo {
+		width: min(180px, 60vw);
+	}
+
+	.jha-course-mobile-menu-toggle {
+		position: relative;
+		display: block;
+		width: 100%;
+		padding: 16px 44px 16px 20px;
+		border: 0;
+		border-top: 1px solid #2f4867;
+		background: #2f4867;
+		color: #fff;
+		font-family: "sinkin_sans600_semibold", Arial, sans-serif;
+		font-size: 0.8rem;
+		font-weight: 600;
+		line-height: 1.3;
+		text-align: left;
+		text-transform: uppercase;
+		letter-spacing: 0.01em;
+		cursor: pointer;
+	}
+
+	.jha-course-mobile-menu-toggle::after {
+		position: absolute;
+		top: 50%;
+		right: 20px;
+		width: 7px;
+		height: 7px;
+		border-right: 1px solid currentColor;
+		border-bottom: 1px solid currentColor;
+		content: "";
+		transform: translateY(-50%) rotate(45deg);
+	}
+
+	.jha-course-mobile-menu-toggle[aria-expanded="true"]::after {
+		transform: translateY(-50%) rotate(225deg);
+	}
+
+	.jha-course-mobile-menu-panel {
+		display: none;
+	}
+
+	.jha-course-mobile-menu-panel.is-mobile-expanded {
+		display: block;
+	}
+
+	.jha-course-progress-tracker {
+		align-items: stretch;
+		aspect-ratio: auto;
+		padding: 0.75rem 1rem;
+	}
+
+	.jha-course-progress-ring {
+		width: 100%;
+		height: 24px;
+		aspect-ratio: auto;
+		border-radius: 999px;
+		background: linear-gradient(
+			to right,
+			#43a8a3 var(--jha-course-progress-percent, 0%),
+			#dcdcde var(--jha-course-progress-percent, 0%)
+		);
+	}
+
+	.jha-course-progress-ring span {
+		position: relative;
+		z-index: 1;
+		padding: 0 0.5rem;
+		color: #2f4867;
+		font-size: 0.8rem;
+		line-height: 1;
+	}
+
+	.jha-course-logo-image {
+		max-height: 120px;
+	}
+
+	.jha-course-main {
+		max-width: none;
+		padding: 2rem;
+		overflow-x: clip;
+	}
+
+	.jha-course-content,
+	.jha-course-content > *,
+	.jha-course-content .wp-block-group,
+	.jha-course-content .wp-block-columns,
+	.jha-course-content .wp-block-column {
+		box-sizing: border-box;
+		max-width: 100%;
+		min-width: 0;
+	}
+
+	.jha-course-content .alignwide,
+	.jha-course-content .alignfull {
+		width: 100%;
+		max-width: 100%;
+		margin-right: 0;
+		margin-left: 0;
+	}
+
+	.jha-course-content table,
+	.jha-course-content pre,
+	.jha-course-content .wp-block-table,
+	.jha-course-content .wp-block-preformatted {
+		max-width: 100%;
+		overflow-x: auto;
+	}
+}
