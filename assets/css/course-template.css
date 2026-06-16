@@ -78,6 +78,10 @@ body.et_fixed_nav.et_show_nav.et_secondary_nav_enabled:not(.et_transparent_nav):
 	list-style: none;
 }
 
+.jha-course-menu {
+	border-bottom: 1px solid #2f4867;
+}
+
 .jha-course-menu-item {
 	position: relative;
 	margin: 0;
@@ -218,7 +222,6 @@ body.et_fixed_nav.et_show_nav.et_secondary_nav_enabled:not(.et_transparent_nav):
 	gap: 0.5rem;
 	aspect-ratio: 1 / 1;
 	padding: 1.5rem;
-	border-top: 1px solid #2f4867;
 	color: #2f4867;
 	text-align: center;
 }
@@ -283,7 +286,7 @@ body.et_fixed_nav.et_show_nav.et_secondary_nav_enabled:not(.et_transparent_nav):
 }
 
 .jha-course-content a {
-	color: #2f4867;
+	color: #43a8a3;
 }
 
 .jha-course-content ul,
@@ -307,6 +310,27 @@ body.et_fixed_nav.et_show_nav.et_secondary_nav_enabled:not(.et_transparent_nav):
 	margin-top: 0.35em;
 }
 
+.jha-course-content .progressally-quiz-container {
+	background: transparent !important;
+	background-color: transparent !important;
+}
+
+.jha-course-content .progressally-quiz-display,
+.jha-course-content ul.progressally-quiz-display {
+	padding-left: 0 !important;
+	margin-left: 0 !important;
+	list-style: none !important;
+}
+
+.jha-course-content .progressally-quiz-choice-item {
+	margin: 5px 0 !important;
+	list-style: none !important;
+}
+
+.jha-course-content .progressally-quiz-choice-item::marker {
+	content: "" !important;
+}
+
 .jha-course-content input[type="radio"] {
 	margin-top: 0;
 	vertical-align: middle;
@@ -320,7 +344,57 @@ body.et_fixed_nav.et_show_nav.et_secondary_nav_enabled:not(.et_transparent_nav):
 }
 
 .jha-course-content .progressally-quiz-choice-input[type="radio"] {
-	top: -4px;
+	top: -1px !important;
+	margin-top: 0 !important;
+}
+
+.jha-course-content .progressally-quiz-choice-label {
+	display: inline-block;
+	line-height: 1.4;
+}
+
+/* Pass-requirement note above the quiz. */
+.jha-course-content .jha-quiz-notice,
+.jha-course-content .progressally-quiz-notice,
+.jha-course-content .quiz-notice,
+.jha-course-content :is(p, .wp-block-paragraph):has(+ .progressally-quiz-container),
+.jha-course-content :is(p, .wp-block-paragraph):has(+ :is(.wp-block-shortcode, [class*="progressally"]):has(.progressally-quiz-container)),
+.jha-course-content .wp-block-group:has(> .progressally-quiz-container) > :is(p, .wp-block-paragraph):last-of-type,
+.jha-course-content .wp-block-group:has(> :is(.wp-block-shortcode, [class*="progressally"]):has(.progressally-quiz-container)) > :is(p, .wp-block-paragraph):last-of-type {
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	padding: 12px 16px;
+	border-radius: 3px;
+	background: #eeeeee;
+	color: #2f4867;
+	font-size: 15px;
+	line-height: 1.4;
+}
+
+.jha-course-content .jha-quiz-notice::before,
+.jha-course-content .progressally-quiz-notice::before,
+.jha-course-content .quiz-notice::before,
+.jha-course-content :is(p, .wp-block-paragraph):has(+ .progressally-quiz-container)::before,
+.jha-course-content :is(p, .wp-block-paragraph):has(+ :is(.wp-block-shortcode, [class*="progressally"]):has(.progressally-quiz-container))::before,
+.jha-course-content .wp-block-group:has(> .progressally-quiz-container) > :is(p, .wp-block-paragraph):last-of-type::before,
+.jha-course-content .wp-block-group:has(> :is(.wp-block-shortcode, [class*="progressally"]):has(.progressally-quiz-container)) > :is(p, .wp-block-paragraph):last-of-type::before {
+	display: inline-grid;
+	flex: 0 0 22px;
+	width: 22px;
+	height: 22px;
+	border-radius: 999px;
+	background: #2f4867;
+	color: #fff;
+	content: "i";
+	font-family: Georgia, "Times New Roman", serif;
+	font-size: 15px;
+	font-style: italic;
+	font-weight: 700;
+	line-height: 1;
+	place-items: center;
 }
 
 .jha-course-content input[type="checkbox"],
@@ -331,6 +405,7 @@ body.et_fixed_nav.et_show_nav.et_secondary_nav_enabled:not(.et_transparent_nav):
 .jha-course-content .objective-table {
 	--jha-progressally-objective-color: #2f4867;
 	--jha-progressally-objective-gap: 0;
+	--jha-progressally-checkmark-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
 	border-collapse: separate !important;
 	border-spacing: 0 var(--jha-progressally-objective-gap) !important;
 }
@@ -397,6 +472,7 @@ body.et_fixed_nav.et_show_nav.et_secondary_nav_enabled:not(.et_transparent_nav):
 	min-width: 48px !important;
 	flex: 0 0 48px !important;
 	align-items: flex-start !important;
+	background-image: none !important;
 	padding: 10px 10px 6px !important;
 	vertical-align: top !important;
 }
@@ -467,21 +543,25 @@ body.et_fixed_nav.et_show_nav.et_secondary_nav_enabled:not(.et_transparent_nav):
 	box-sizing: border-box !important;
 	position: relative !important;
 	top: auto !important;
-	display: inline-grid !important;
+	display: inline-flex !important;
+	flex: 0 0 24px !important;
 	align-items: center !important;
 	justify-content: center !important;
-	place-items: center !important;
 	width: 24px !important;
+	min-width: 24px !important;
 	height: 24px !important;
-	padding: 2px !important;
+	min-height: 24px !important;
+	padding: 0 !important;
 	margin: 0 !important;
-	border-color: #eeeeee !important;
+	border: 2px solid #eeeeee !important;
 	border-radius: 3px !important;
 	background: #eeeeee !important;
 	background-color: #eeeeee !important;
 	background-image: none !important;
-	color: #fff !important;
+	color: transparent !important;
+	font-size: 0 !important;
 	line-height: 1 !important;
+	overflow: hidden !important;
 	transform: none !important;
 }
 
@@ -492,43 +572,32 @@ body.et_fixed_nav.et_show_nav.et_secondary_nav_enabled:not(.et_transparent_nav):
 	border-color: var(--jha-progressally-objective-color, #2f4867) !important;
 	background: var(--jha-progressally-objective-color, #2f4867) !important;
 	background-color: var(--jha-progressally-objective-color, #2f4867) !important;
-	background-image: none !important;
+	background-image: var(--jha-progressally-checkmark-icon) !important;
+	background-position: center center !important;
+	background-repeat: no-repeat !important;
+	background-size: 14px 14px !important;
 }
 
 .jha-course-template .objective-table input[type="checkbox"].completion-checkbox + label.progressally-space-click::before,
-.jha-course-content .objective-table input[type="checkbox"].completion-checkbox + label.progressally-space-click::before {
-	content: "" !important;
-	display: none !important;
-}
-
-.jha-course-template .objective-table input[type="checkbox"].completion-checkbox:checked + label.progressally-space-click::before,
-.jha-course-content .objective-table input[type="checkbox"].completion-checkbox:checked + label.progressally-space-click::before,
-.jha-course-template .objective-table .objective-completion .completion-checkbox:checked + label::before,
-.jha-course-content .objective-table .completion-checkbox:checked + label::before {
-	content: "" !important;
-	display: block !important;
-	position: absolute !important;
-	top: 50% !important;
-	left: 50% !important;
-	width: 5px !important;
-	height: 11px !important;
-	margin: 0 !important;
-	padding: 0 !important;
-	border: 0 !important;
-	border-right: 2px solid #fff !important;
-	border-bottom: 2px solid #fff !important;
-	background: transparent !important;
-	color: #fff !important;
-	transform: translate(-50%, -58%) rotate(45deg) !important;
-	transform-origin: center !important;
-}
-
-.jha-course-template .objective-table input[type="checkbox"].completion-checkbox + label.progressally-space-click::after,
+.jha-course-template .objective-table .objective-table input[type="checkbox"].completion-checkbox + label.progressally-space-click::after,
+.jha-course-content .objective-table input[type="checkbox"].completion-checkbox + label.progressally-space-click::before,
 .jha-course-content .objective-table input[type="checkbox"].completion-checkbox + label.progressally-space-click::after,
+.jha-course-template .objective-table .objective-completion .completion-checkbox + label::before,
 .jha-course-template .objective-table .objective-completion .completion-checkbox + label::after,
+.jha-course-content .objective-table .completion-checkbox + label::before,
 .jha-course-content .objective-table .completion-checkbox + label::after {
 	content: none !important;
 	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	border: 0 !important;
+	background: none !important;
+	font-family: inherit !important;
+	font-size: 0 !important;
+	line-height: 0 !important;
+	transform: none !important;
 }
 
 .jha-course-content [class*="progressally"] ol > li::marker,

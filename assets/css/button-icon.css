@@ -1,0 +1,95 @@
+.wp-block-button[data-jha-icon] .wp-block-button__link,
+.block-editor-block-list__block[data-jha-icon] .wp-block-button__link {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5em;
+}
+
+.jha-button-icon-wrap {
+	--jha-button-icon-size: 1.05em;
+	--jha-button-icon-circle-padding: 0.35em;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	line-height: 1;
+}
+
+.jha-button-icon-wrap--circle {
+	box-sizing: border-box;
+	width: calc(var(--jha-button-icon-size) + (var(--jha-button-icon-circle-padding) * 2) + 0.15em);
+	height: calc(var(--jha-button-icon-size) + (var(--jha-button-icon-circle-padding) * 2) + 0.15em);
+	padding: var(--jha-button-icon-circle-padding);
+	border: 1.5px solid currentColor;
+	border-radius: 50%;
+	background: transparent;
+}
+
+.jha-button-icon-glyph {
+	display: block;
+	width: var(--jha-button-icon-size);
+	height: var(--jha-button-icon-size);
+	background-color: currentColor;
+	-webkit-mask-repeat: no-repeat;
+	mask-repeat: no-repeat;
+	-webkit-mask-position: center;
+	mask-position: center;
+	-webkit-mask-size: contain;
+	mask-size: contain;
+}
+
+.wp-block-button.jha-button-icon-hover[data-jha-icon-visibility="hover"]:not(:hover):not(:focus-within) .jha-button-icon-wrap,
+.block-editor-block-list__block.jha-button-icon-hover[data-jha-icon-visibility="hover"]:not(:hover):not(:focus-within) .jha-button-icon-wrap {
+	display: none;
+}
+
+.jha-button-icon-settings-help {
+	margin: 0;
+	color: #757575;
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.jha-button-icon-picker {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 8px;
+	margin-top: 4px;
+}
+
+.jha-button-icon-picker__option.components-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	min-width: 0;
+	height: 40px;
+	padding: 6px;
+	border-radius: 4px;
+	box-shadow: inset 0 0 0 1px #dcdcde;
+}
+
+.jha-button-icon-picker__option.components-button.is-pressed {
+	box-shadow: inset 0 0 0 2px var(--wp-admin-theme-color, #3858e9);
+}
+
+.jha-button-icon-picker__icon {
+	display: block;
+	width: 22px;
+	height: 22px;
+	background-color: currentColor;
+	-webkit-mask-repeat: no-repeat;
+	mask-repeat: no-repeat;
+	-webkit-mask-position: center;
+	mask-position: center;
+	-webkit-mask-size: contain;
+	mask-size: contain;
+}
+
+.jha-button-icon-picker__none {
+	display: block;
+	font-size: 18px;
+	line-height: 1;
+	color: #757575;
+}

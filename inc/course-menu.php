@@ -95,24 +95,25 @@ function jha_get_course_menu_label( $post_id ) {
  *
  * @param int  $course_parent_id Top-level course parent ID.
  * @param bool $include_hidden Whether to include pages hidden from the course menu.
+ * @param bool $filter_access Whether to exclude pages the current user cannot access.
  * @return array<int, array<string, mixed>>
  */
-function jha_get_course_menu_tree( $course_parent_id, $include_hidden = false ) {
+function jha_get_course_menu_tree( $course_parent_id, $include_hidden = false, $filter_access = true ) {
 	$course_parent_id = absint( $course_parent_id );
 	$stored_tree      = get_post_meta( $course_parent_id, '_jha_course_menu_tree', true );
 	$decoded_tree     = is_string( $stored_tree ) && '' !== $stored_tree ? json_decode( $stored_tree, true ) : null;
 
 	if ( is_array( $decoded_tree ) ) {
-		$prepared_tree = jha_prepare_course_menu_tree_nodes( $decoded_tree, $include_hidden );
+		$prepared_tree = jha_prepare_course_menu_tree_nodes( $decoded_tree, $include_hidden, $filter_access );
 		$tracked_ids   = jha_get_course_menu_tree_page_ids( $prepared_tree );
 
 		return array_merge(
 			$prepared_tree,
-			jha_build_course_menu_tree_from_pages( $course_parent_id, $include_hidden, $tracked_ids )
+			jha_build_course_menu_tree_from_pages( $course_parent_id, $include_hidden, $tracked_ids, $filter_access )
 		);
 	}
 
-	return jha_build_course_menu_tree_from_pages( $course_parent_id, $include_hidden );
+	return jha_build_course_menu_tree_from_pages( $course_parent_id, $include_hidden, array(), $filter_access );
 }
 
 /**
@@ -120,9 +121,10 @@ function jha_get_course_menu_tree( $course_parent_id, $include_hidden = false ) 
  *
  * @param array $nodes Raw tree nodes.
  * @param bool  $include_hidden Whether to include pages hidden from the course menu.
+ * @param bool  $filter_access Whether to exclude pages the current user cannot access.
  * @return array<int, array<string, mixed>>
  */
-function jha_prepare_course_menu_tree_nodes( $nodes, $include_hidden = false ) {
+function jha_prepare_course_menu_tree_nodes( $nodes, $include_hidden = false, $filter_access = true ) {
 	$prepared = array();
 
 	foreach ( $nodes as $node ) {
@@ -133,13 +135,13 @@ function jha_prepare_course_menu_tree_nodes( $nodes, $include_hidden = false ) {
 		$token    = (string) $node['token'];
 		$type     = isset( $node['type'] ) ? sanitize_key( (string) $node['type'] ) : '';
 		$children = isset( $node['children'] ) && is_array( $node['children'] )
-			? jha_prepare_course_menu_tree_nodes( $node['children'], $include_hidden )
+			? jha_prepare_course_menu_tree_nodes( $node['children'], $include_hidden, $filter_access )
 			: array();
 
 		if ( 'menu' === $type || 0 === strpos( $token, 'menu-' ) ) {
 			$title = isset( $node['title'] ) ? sanitize_text_field( (string) $node['title'] ) : '';
 
-			if ( '' === $title ) {
+			if ( '' === $title || ( $filter_access && empty( $children ) ) ) {
 				continue;
 			}
 
@@ -160,6 +162,10 @@ function jha_prepare_course_menu_tree_nodes( $nodes, $include_hidden = false ) {
 		}
 
 		if ( ! $include_hidden && jha_course_page_is_hidden_from_menu( $page_id ) ) {
+			continue;
+		}
+
+		if ( $filter_access && ! jha_user_can_access_course_page( $page_id ) ) {
 			continue;
 		}
 
@@ -202,9 +208,10 @@ function jha_get_course_menu_tree_page_ids( $nodes ) {
  * @param int   $parent_id Parent page ID.
  * @param bool  $include_hidden Whether to include pages hidden from the course menu.
  * @param int[] $exclude_ids Page IDs already represented in a saved menu tree.
+ * @param bool  $filter_access Whether to exclude pages the current user cannot access.
  * @return array<int, array<string, mixed>>
  */
-function jha_build_course_menu_tree_from_pages( $parent_id, $include_hidden = false, $exclude_ids = array() ) {
+function jha_build_course_menu_tree_from_pages( $parent_id, $include_hidden = false, $exclude_ids = array(), $filter_access = true ) {
 	$tree = array();
 
 	foreach ( jha_get_course_child_pages( $parent_id, $include_hidden ) as $child ) {
@@ -212,11 +219,15 @@ function jha_build_course_menu_tree_from_pages( $parent_id, $include_hidden = fa
 			continue;
 		}
 
+		if ( $filter_access && ! jha_user_can_access_course_page( $child->ID ) ) {
+			continue;
+		}
+
 		$tree[] = array(
 			'type'     => 'page',
 			'token'    => (string) $child->ID,
 			'page'     => $child,
-			'children' => jha_build_course_menu_tree_from_pages( $child->ID, $include_hidden, $exclude_ids ),
+			'children' => jha_build_course_menu_tree_from_pages( $child->ID, $include_hidden, $exclude_ids, $filter_access ),
 		);
 	}
 
@@ -260,6 +271,120 @@ function jha_should_show_course_title( $post_id ) {
  */
 function jha_course_page_is_hidden_from_menu( $post_id ) {
 	return '1' === get_post_meta( absint( $post_id ), '_jha_course_hide_from_menu', true );
+}
+
+/**
+ * Whether a page stores the course sidebar menu tree.
+ *
+ * @param int $post_id Page ID.
+ * @return bool
+ */
+function jha_page_owns_course_menu_tree( $post_id ) {
+	$post_id = absint( $post_id );
+
+	if ( ! $post_id ) {
+		return false;
+	}
+
+	$menu_tree = get_post_meta( $post_id, '_jha_course_menu_tree', true );
+
+	if ( is_string( $menu_tree ) && '' !== $menu_tree && '[]' !== $menu_tree ) {
+		return true;
+	}
+
+	$lesson_tree = get_post_meta( $post_id, '_jha_course_lesson_tree', true );
+
+	return is_string( $lesson_tree ) && '' !== $lesson_tree && '[]' !== $lesson_tree;
+}
+
+/**
+ * Whether the current page is the top-level course home page.
+ *
+ * @param int $post_id Page ID.
+ * @return bool
+ */
+function jha_is_course_root_page( $post_id ) {
+	$post_id = absint( $post_id );
+
+	if ( ! $post_id ) {
+		return false;
+	}
+
+	if ( jha_page_owns_course_menu_tree( $post_id ) ) {
+		return true;
+	}
+
+	if ( wp_get_post_parent_id( $post_id ) ) {
+		return false;
+	}
+
+	return (
+		'page-templates/course-template.php' === get_page_template_slug( $post_id )
+		&& $post_id === jha_get_course_parent_id( $post_id )
+		&& ! empty( jha_get_course_child_pages( $post_id, true ) )
+	);
+}
+
+/**
+ * Whether the course progress ring should display for the current page.
+ *
+ * Explicit meta values always win. The course home page defaults to off; lesson
+ * pages default to on unless an editor turns the ring off.
+ *
+ * @param int $post_id Page ID.
+ * @return bool
+ */
+function jha_should_show_course_progress( $post_id ) {
+	$post_id = absint( $post_id );
+	$value   = get_post_meta( $post_id, '_jha_course_show_progress', true );
+
+	if ( '1' === $value ) {
+		return true;
+	}
+
+	if ( '0' === $value ) {
+		return false;
+	}
+
+	if ( jha_is_course_root_page( $post_id ) ) {
+		return false;
+	}
+
+	return true;
+}
+
+/**
+ * Whether the current user can access a course page through AccessAlly.
+ *
+ * @param int $post_id Page ID.
+ * @return bool
+ */
+function jha_user_can_access_course_page( $post_id ) {
+	$post_id = absint( $post_id );
+
+	if ( ! $post_id ) {
+		return false;
+	}
+
+	if ( class_exists( 'AccessAlly' ) && method_exists( 'AccessAlly', 'can_current_user_read' ) ) {
+		return (bool) AccessAlly::can_current_user_read( $post_id );
+	}
+
+	return true;
+}
+
+/**
+ * Whether a course page should appear in the frontend sidebar menu.
+ *
+ * @param int $post_id Page ID.
+ * @return bool
+ */
+function jha_course_page_is_visible_in_menu( $post_id ) {
+	if ( jha_course_page_is_hidden_from_menu( $post_id ) ) {
+		return false;
+	}
+
+	return jha_user_can_access_course_page( $post_id );
 }
 
 /**
@@ -722,10 +847,11 @@ function jha_render_course_menu_node( $node, $current_post_id, $current_ancestor
  * @param int   $parent_id Parent page ID.
  * @param array $pages Flat page list passed by reference.
  * @param bool  $include_hidden Whether to include pages hidden from the course menu.
+ * @param bool  $filter_access Whether to exclude pages the current user cannot access.
  * @return void
  */
-function jha_append_course_navigation_pages( $parent_id, &$pages, $include_hidden = false ) {
-	foreach ( jha_get_course_menu_tree( $parent_id, $include_hidden ) as $node ) {
+function jha_append_course_navigation_pages( $parent_id, &$pages, $include_hidden = false, $filter_access = true ) {
+	foreach ( jha_get_course_menu_tree( $parent_id, $include_hidden, $filter_access ) as $node ) {
 		jha_append_course_navigation_node_pages( $node, $pages );
 	}
 }
@@ -758,18 +884,21 @@ function jha_append_course_navigation_node_pages( $node, &$pages ) {
  *
  * @param int  $course_parent_id Top-level course parent ID.
  * @param bool $include_hidden Whether to include pages hidden from the course menu.
+ * @param bool $filter_access Whether to exclude pages the current user cannot access.
  * @return WP_Post[] Ordered course pages.
  */
-function jha_get_course_navigation_pages( $course_parent_id, $include_hidden = false ) {
+function jha_get_course_navigation_pages( $course_parent_id, $include_hidden = false, $filter_access = true ) {
 	$course_parent_id = absint( $course_parent_id );
 	$course_parent    = get_post( $course_parent_id );
 	$pages            = array();
 
 	if ( $course_parent && 'page' === $course_parent->post_type ) {
-		$pages[] = $course_parent;
+		if ( ! $filter_access || jha_user_can_access_course_page( $course_parent_id ) ) {
+			$pages[] = $course_parent;
+		}
 	}
 
-	jha_append_course_navigation_pages( $course_parent_id, $pages, $include_hidden );
+	jha_append_course_navigation_pages( $course_parent_id, $pages, $include_hidden, $filter_access );
 
 	return $pages;
 }
@@ -823,7 +952,11 @@ function jha_render_course_sidebar( $course_parent_id, $current_post_id ) {
 	}
 
 	echo '</ul>';
-	jha_render_course_progress_tracker( $course_parent_id );
+
+	if ( jha_should_show_course_progress( $current_post_id ) ) {
+		jha_render_course_progress_tracker( $course_parent_id );
+	}
+
 	echo '</div>';
 	echo '</nav>';
 	echo '</aside>';

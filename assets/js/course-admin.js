@@ -29,6 +29,28 @@
 			});
 		}
 
+		var $showProgressInput = $('#jha-course-show-progress');
+
+		function syncCourseProgressMeta() {
+			if (!$showProgressInput.length) {
+				return;
+			}
+
+			if (!window.wp || !wp.data || !wp.data.dispatch) {
+				return;
+			}
+
+			wp.data.dispatch('core/editor').editPost({
+				meta: {
+					_jha_course_show_progress: $showProgressInput.is(':checked') ? '1' : '0',
+				},
+			});
+		}
+
+		if ($showProgressInput.length) {
+			$showProgressInput.on('change', syncCourseProgressMeta);
+		}
+
 		function getSelectedPageTemplate() {
 			var $classicTemplateSelect = $('#page_template, select[name="page_template"]').first();
 			var editor;

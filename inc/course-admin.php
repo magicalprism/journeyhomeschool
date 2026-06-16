@@ -96,8 +96,33 @@ function jha_register_course_lesson_post_meta() {
 			'sanitize_callback' => 'sanitize_text_field',
 		)
 	);
+
+	register_post_meta(
+		'page',
+		'_jha_course_show_progress',
+		array(
+			'type'              => 'string',
+			'single'            => true,
+			'show_in_rest'      => true,
+			'auth_callback'     => $auth_callback,
+			'sanitize_callback' => 'jha_sanitize_course_show_progress_meta',
+		)
+	);
 }
 add_action( 'init', 'jha_register_course_lesson_post_meta' );
+
+/**
+ * Sanitize the course progress sidebar toggle meta value.
+ *
+ * @param mixed $value Raw meta value.
+ * @param int   $post_id Page ID.
+ * @return string
+ */
+function jha_sanitize_course_show_progress_meta( $value, $post_id = 0 ) {
+	unset( $post_id );
+
+	return '1' === (string) $value ? '1' : '0';
+}
 
 /**
  * Sanitize the JSON lesson tree stored in post meta.
@@ -288,6 +313,7 @@ add_action( 'add_meta_boxes_page', 'jha_register_course_admin_meta_boxes' );
  */
 function jha_render_course_settings_meta_box( $post ) {
 	wp_nonce_field( 'jha_save_course_page_settings', 'jha_course_page_settings_nonce' );
+	jha_render_course_toggle_styles();
 	?>
 	<div class="jha-course-settings-section">
 		<h3><?php esc_html_e( 'Course Menu Settings', 'journey-homeschool-academy' ); ?></h3>
@@ -314,6 +340,8 @@ function jha_render_course_menu_settings_meta_box( $post ) {
 	$block_gap       = jha_get_course_block_gap( $post->ID );
 	$block_gap_value = (float) str_replace( 'rem', '', $block_gap );
 	$show_title      = jha_should_show_course_title( $post->ID );
+	$is_course_root  = jha_is_course_root_page( $post->ID );
+	$show_progress   = jha_should_show_course_progress( $post->ID );
 	?>
 	<p>
 		<label for="jha-course-menu-label">
@@ -330,26 +358,6 @@ function jha_render_course_menu_settings_meta_box( $post ) {
 	>
 	<p class="description">
 		<?php esc_html_e( 'Optional. Used only for the lightweight course sidebar menu; the page title stays unchanged.', 'journey-homeschool-academy' ); ?>
-	</p>
-
-	<p>
-		<input type="hidden" name="jha_course_show_title" value="0">
-		<label class="jha-course-toggle-control" for="jha-course-show-title">
-			<input
-				type="checkbox"
-				id="jha-course-show-title"
-				name="jha_course_show_title"
-				value="1"
-				<?php checked( $show_title ); ?>
-			>
-			<span class="jha-course-toggle-switch" aria-hidden="true"></span>
-			<span class="jha-course-toggle-label">
-				<?php esc_html_e( 'Show page title in template', 'journey-homeschool-academy' ); ?>
-			</span>
-		</label>
-	</p>
-	<p class="description">
-		<?php esc_html_e( 'Turn this off when the page content already includes its own heading block.', 'journey-homeschool-academy' ); ?>
 	</p>
 
 	<p>
@@ -372,6 +380,134 @@ function jha_render_course_menu_settings_meta_box( $post ) {
 	<p class="description">
 		<?php esc_html_e( 'Controls vertical spacing between top-level Gutenberg blocks in this template, from 0rem to 5rem in 0.5rem steps.', 'journey-homeschool-academy' ); ?>
 	</p>
+
+	<p>
+		<input type="hidden" name="jha_course_show_progress" value="0">
+		<label class="jha-course-toggle-control" for="jha-course-show-progress">
+			<input
+				type="checkbox"
+				id="jha-course-show-progress"
+				name="jha_course_show_progress"
+				value="1"
+				<?php checked( $show_progress ); ?>
+			>
+			<span class="jha-course-toggle-switch" aria-hidden="true"></span>
+			<span class="jha-course-toggle-label">
+				<?php esc_html_e( 'Show course progress ring in sidebar', 'journey-homeschool-academy' ); ?>
+			</span>
+		</label>
+	</p>
+	<p class="description">
+		<?php
+		if ( $is_course_root ) {
+			esc_html_e( 'Defaults to off on the course home page. Turn this on to show the progress ring while students are on the course home page.', 'journey-homeschool-academy' );
+		} else {
+			esc_html_e( 'Turn this off to hide the course progress ring while students are on this lesson page.', 'journey-homeschool-academy' );
+		}
+		?>
+	</p>
+
+	<p>
+		<input type="hidden" name="jha_course_show_title" value="0">
+		<label class="jha-course-toggle-control" for="jha-course-show-title">
+			<input
+				type="checkbox"
+				id="jha-course-show-title"
+				name="jha_course_show_title"
+				value="1"
+				<?php checked( $show_title ); ?>
+			>
+			<span class="jha-course-toggle-switch" aria-hidden="true"></span>
+			<span class="jha-course-toggle-label">
+				<?php esc_html_e( 'Show page title in template', 'journey-homeschool-academy' ); ?>
+			</span>
+		</label>
+	</p>
+	<p class="description">
+		<?php esc_html_e( 'Turn this off when the page content already includes its own heading block.', 'journey-homeschool-academy' ); ?>
+	</p>
+	<?php
+}
+
+/**
+ * Output shared styles for course settings toggle controls.
+ *
+ * @return void
+ */
+function jha_render_course_toggle_styles() {
+	static $rendered = false;
+
+	if ( $rendered ) {
+		return;
+	}
+
+	$rendered = true;
+	?>
+	<style>
+		.jha-course-toggle-control {
+			display: inline-flex;
+			align-items: center;
+			gap: 10px;
+			cursor: pointer;
+			font-weight: 600;
+		}
+
+		.jha-course-toggle-control input {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			padding: 0;
+			margin: -1px;
+			overflow: hidden;
+			clip: rect(0, 0, 0, 0);
+			white-space: nowrap;
+			border: 0;
+		}
+
+		.jha-course-toggle-switch {
+			position: relative;
+			display: inline-block;
+			width: 42px;
+			height: 22px;
+			border-radius: 999px;
+			background: #8c8f94;
+			transition: background-color 160ms ease;
+		}
+
+		.jha-course-toggle-switch::before {
+			position: absolute;
+			top: 3px;
+			left: 3px;
+			width: 16px;
+			height: 16px;
+			border-radius: 50%;
+			background: #fff;
+			content: "";
+			transition: transform 160ms ease;
+		}
+
+		.jha-course-toggle-control input:checked + .jha-course-toggle-switch {
+			background: var(--wp-admin-theme-color, #2271b1);
+		}
+
+		.jha-course-toggle-control input:checked + .jha-course-toggle-switch::before {
+			transform: translateX(20px);
+		}
+
+		.jha-course-toggle-control input:focus + .jha-course-toggle-switch {
+			box-shadow: 0 0 0 2px #fff, 0 0 0 4px #2271b1;
+		}
+
+		.jha-course-toggle-control input:disabled + .jha-course-toggle-switch {
+			opacity: 0.55;
+			cursor: not-allowed;
+		}
+
+		.jha-course-toggle-control input:disabled ~ .jha-course-toggle-label {
+			opacity: 0.75;
+			cursor: not-allowed;
+		}
+	</style>
 	<?php
 }
 
@@ -721,60 +857,6 @@ function jha_render_course_child_order_meta_box( $post ) {
 			grid-template-columns: minmax(220px, 1fr) minmax(320px, 2fr);
 			gap: 24px;
 			align-items: start;
-		}
-
-		.jha-course-toggle-control {
-			display: inline-flex;
-			align-items: center;
-			gap: 10px;
-			cursor: pointer;
-			font-weight: 600;
-		}
-
-		.jha-course-toggle-control input {
-			position: absolute;
-			width: 1px;
-			height: 1px;
-			padding: 0;
-			margin: -1px;
-			overflow: hidden;
-			clip: rect(0, 0, 0, 0);
-			white-space: nowrap;
-			border: 0;
-		}
-
-		.jha-course-toggle-switch {
-			position: relative;
-			display: inline-block;
-			width: 42px;
-			height: 22px;
-			border-radius: 999px;
-			background: #8c8f94;
-			transition: background-color 160ms ease;
-		}
-
-		.jha-course-toggle-switch::before {
-			position: absolute;
-			top: 3px;
-			left: 3px;
-			width: 16px;
-			height: 16px;
-			border-radius: 50%;
-			background: #fff;
-			content: "";
-			transition: transform 160ms ease;
-		}
-
-		.jha-course-toggle-control input:checked + .jha-course-toggle-switch {
-			background: var(--wp-admin-theme-color, #2271b1);
-		}
-
-		.jha-course-toggle-control input:checked + .jha-course-toggle-switch::before {
-			transform: translateX(20px);
-		}
-
-		.jha-course-toggle-control input:focus + .jha-course-toggle-switch {
-			box-shadow: 0 0 0 2px #fff, 0 0 0 4px #2271b1;
 		}
 
 		<?php if ( ! $is_course_template ) : ?>
@@ -1296,6 +1378,14 @@ function jha_save_course_page_settings( $post_id ) {
 		}
 	}
 
+	if ( $has_settings_nonce && jha_has_posted_string( 'jha_course_show_progress' ) ) {
+		if ( '1' === jha_get_posted_string( 'jha_course_show_progress' ) ) {
+			update_post_meta( $post_id, '_jha_course_show_progress', '1' );
+		} else {
+			update_post_meta( $post_id, '_jha_course_show_progress', '0' );
+		}
+	}
+
 	if ( ! $is_primary_editor_save ) {
 		return;
 	}
@@ -1425,7 +1515,7 @@ function jha_save_course_page_settings( $post_id ) {
 
 	update_post_meta( $post_id, '_jha_course_menu_tree', wp_json_encode( $saved_tree ) );
 
-	foreach ( jha_get_course_navigation_pages( $post_id, true ) as $course_page ) {
+	foreach ( jha_get_course_navigation_pages( $post_id, true, false ) as $course_page ) {
 		if ( absint( $course_page->ID ) === absint( $post_id ) ) {
 			continue;
 		}
