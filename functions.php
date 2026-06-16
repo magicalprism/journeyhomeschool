@@ -42,6 +42,62 @@ function my_theme_enqueue_styles() {
 add_action( 'wp_enqueue_scripts', 'my_theme_enqueue_styles' );
 
 /**
+ * ProgressAlly's Gutenberg style depends on this handle even when the plugin
+ * has no generated frontend styling file, so provide a fallback handle without
+ * blocking the real generated stylesheet when it exists.
+ */
+function jha_register_progressally_frontend_style_fallback() {
+	if ( wp_style_is( 'progressally-frontend-styling', 'registered' ) ) {
+		return;
+	}
+
+	$generated_css_path = WP_CONTENT_DIR . '/progressally-css/progressally-style.css';
+	$generated_css_url  = content_url( 'progressally-css/progressally-style.css' );
+	$generated_version  = file_exists( $generated_css_path ) ? (string) filemtime( $generated_css_path ) : wp_get_theme()->get( 'Version' );
+
+	if ( file_exists( $generated_css_path ) ) {
+		wp_register_style( 'progressally-frontend-styling', $generated_css_url, array(), $generated_version );
+		return;
+	}
+
+	wp_register_style( 'progressally-frontend-styling', false, array(), wp_get_theme()->get( 'Version' ) );
+}
+add_action( 'init', 'jha_register_progressally_frontend_style_fallback', 9 );
+
+/**
+ * Register custom editor blocks provided by the child theme.
+ */
+function jha_register_theme_blocks() {
+	$block_style_path = get_stylesheet_directory() . '/assets/css/icon-callout.css';
+	$block_script_path = get_stylesheet_directory() . '/assets/js/icon-callout-block.js';
+
+	wp_register_style(
+		'jha-icon-callout-block',
+		get_stylesheet_directory_uri() . '/assets/css/icon-callout.css',
+		array(),
+		file_exists( $block_style_path ) ? (string) filemtime( $block_style_path ) : wp_get_theme()->get( 'Version' )
+	);
+
+	wp_register_script(
+		'jha-icon-callout-block',
+		get_stylesheet_directory_uri() . '/assets/js/icon-callout-block.js',
+		array( 'wp-blocks', 'wp-block-editor', 'wp-components', 'wp-element', 'wp-i18n' ),
+		file_exists( $block_script_path ) ? (string) filemtime( $block_script_path ) : wp_get_theme()->get( 'Version' ),
+		true
+	);
+
+	register_block_type(
+		'jha/icon-callout',
+		array(
+			'editor_script' => 'jha-icon-callout-block',
+			'editor_style'  => 'jha-icon-callout-block',
+			'style'         => 'jha-icon-callout-block',
+		)
+	);
+}
+add_action( 'init', 'jha_register_theme_blocks' );
+
+/**
  * Load the lightweight course template stylesheet only for pages that opt in.
  */
 function jha_enqueue_course_template_assets() {
@@ -50,8 +106,18 @@ function jha_enqueue_course_template_assets() {
 	}
 
 	$style_dependencies = array( 'child-style' );
+	$generated_css_path = WP_CONTENT_DIR . '/progressally-css/progressally-style.css';
 
-	if ( wp_style_is( 'progressally-frontend-styling', 'enqueued' ) || wp_style_is( 'progressally-frontend-styling', 'registered' ) ) {
+	if ( file_exists( $generated_css_path ) ) {
+		wp_enqueue_style(
+			'jha-progressally-frontend-styling',
+			content_url( 'progressally-css/progressally-style.css' ),
+			array(),
+			(string) filemtime( $generated_css_path )
+		);
+
+		$style_dependencies[] = 'jha-progressally-frontend-styling';
+	} elseif ( wp_style_is( 'progressally-frontend-styling', 'enqueued' ) || wp_style_is( 'progressally-frontend-styling', 'registered' ) ) {
 		$style_dependencies[] = 'progressally-frontend-styling';
 	}
 
@@ -91,8 +157,12 @@ function jha_print_course_template_progressally_overrides() {
 	if ( ! is_page_template( 'page-templates/course-template.php' ) ) {
 		return;
 	}
+
+	$style_id = 'wp_footer' === current_filter()
+		? 'jha-progressally-objective-final-overrides'
+		: 'jha-progressally-objective-overrides';
 	?>
-	<style id="jha-progressally-objective-overrides">
+	<style id="<?php echo esc_attr( $style_id ); ?>">
 		body .jha-course-template .objective-table,
 		body .jha-course-content .objective-table {
 			--jha-progressally-objective-color: #2f4867;
@@ -174,6 +244,7 @@ function jha_print_course_template_progressally_overrides() {
 			min-width: 48px !important;
 			flex: 0 0 48px !important;
 			align-items: flex-start !important;
+			background-image: none !important;
 			padding: 10px 10px 6px !important;
 			vertical-align: top !important;
 		}
@@ -298,193 +369,7 @@ function jha_print_course_template_progressally_overrides() {
 	<?php
 }
 add_action( 'wp_head', 'jha_print_course_template_progressally_overrides', 999 );
-
-/**
- * Final ProgressAlly objective override for environments with reordered CSS.
- */
-function jha_print_progressally_objective_final_overrides() {
-	?>
-	<style id="jha-progressally-objective-final-overrides">
-		body .objective-table {
-			--jha-progressally-objective-color: #2f4867;
-			--jha-progressally-objective-gap: 0;
-		}
-
-		body table.objective-table {
-			padding: 0 !important;
-			border-collapse: separate !important;
-			border-spacing: 0 var(--jha-progressally-objective-gap) !important;
-		}
-
-		body .objective-table tr,
-		body .objective-table .progressally-flex-row {
-			align-items: center !important;
-			border: 1px solid #eeeeee !important;
-		}
-
-		body .objective-table tr > td {
-			padding: 8px 10px !important;
-			border-top: 1px solid #eeeeee !important;
-			border-bottom: 1px solid #eeeeee !important;
-			vertical-align: middle !important;
-		}
-
-		body .objective-table tr > td:first-child {
-			border-left: 1px solid #eeeeee !important;
-		}
-
-		body .objective-table tr > td:last-child {
-			border-right: 1px solid #eeeeee !important;
-		}
-
-		body .objective-table tr:first-child > td:first-child,
-		body .objective-table .progressally-flex-row:first-child {
-			border-top-left-radius: 6px !important;
-		}
-
-		body .objective-table tr:first-child > td:last-child,
-		body .objective-table .progressally-flex-row:first-child {
-			border-top-right-radius: 6px !important;
-		}
-
-		body .objective-table tr:last-child > td:first-child,
-		body .objective-table .progressally-flex-row:last-child {
-			border-bottom-left-radius: 6px !important;
-		}
-
-		body .objective-table tr:last-child > td:last-child,
-		body .objective-table .progressally-flex-row:last-child {
-			border-bottom-right-radius: 6px !important;
-		}
-
-		body div.objective-table .progressally-flex-row {
-			padding: 8px 10px !important;
-		}
-
-		body .objective-table .progressally-flex-cell {
-			align-items: center !important;
-		}
-
-		body .objective-table .objective-number {
-			width: 48px !important;
-			min-width: 48px !important;
-			flex: 0 0 48px !important;
-			align-items: flex-start !important;
-			padding: 10px 10px 6px !important;
-			vertical-align: top !important;
-		}
-
-		body .objective-table .objective-description {
-			padding: 8px 10px !important;
-			line-height: 24px !important;
-			vertical-align: middle !important;
-		}
-
-		body .objective-table .objective-completion {
-			width: 24px !important;
-			min-width: 24px !important;
-			flex: 0 0 24px !important;
-			align-items: flex-start !important;
-			justify-content: flex-end !important;
-			padding: 10px 10px 6px !important;
-			text-align: right !important;
-			vertical-align: top !important;
-		}
-
-		body .objective-table .pa-objective-circle {
-			box-sizing: border-box !important;
-			display: inline-block !important;
-			flex: 0 0 28px !important;
-			aspect-ratio: 1 / 1 !important;
-			width: 28px !important;
-			height: 28px !important;
-			min-width: 28px !important;
-			min-height: 28px !important;
-			padding: 0 !important;
-			border-color: var(--jha-progressally-objective-color, #2f4867) !important;
-			border-radius: 999px !important;
-			background-color: var(--jha-progressally-objective-color, #2f4867) !important;
-			color: #fff !important;
-			font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif !important;
-			font-size: 13px !important;
-			font-style: normal !important;
-			font-weight: 700 !important;
-			letter-spacing: 0 !important;
-			line-height: 28px !important;
-			text-align: center !important;
-			text-indent: 1px !important;
-		}
-
-		body .objective-table input[type="checkbox"].completion-checkbox {
-			position: absolute !important;
-			display: none !important;
-			width: 0 !important;
-			height: 0 !important;
-			margin: 0 !important;
-			opacity: 0 !important;
-			appearance: none !important;
-			-webkit-appearance: none !important;
-		}
-
-		body .objective-table input[type="checkbox"].completion-checkbox + label.progressally-space-click {
-			box-sizing: border-box !important;
-			position: relative !important;
-			top: auto !important;
-			display: inline-grid !important;
-			place-items: center !important;
-			width: 24px !important;
-			height: 24px !important;
-			padding: 2px !important;
-			margin: 0 !important;
-			border-color: #eeeeee !important;
-			border-radius: 3px !important;
-			background: #eeeeee !important;
-			background-color: #eeeeee !important;
-			background-image: none !important;
-			color: #fff !important;
-			line-height: 1 !important;
-			transform: none !important;
-		}
-
-		body .objective-table input[type="checkbox"].completion-checkbox:checked + label.progressally-space-click {
-			border-color: var(--jha-progressally-objective-color, #2f4867) !important;
-			background: var(--jha-progressally-objective-color, #2f4867) !important;
-			background-color: var(--jha-progressally-objective-color, #2f4867) !important;
-			background-image: none !important;
-		}
-
-		body .objective-table input[type="checkbox"].completion-checkbox + label.progressally-space-click::before {
-			content: "" !important;
-			display: none !important;
-		}
-
-		body .objective-table input[type="checkbox"].completion-checkbox:checked + label.progressally-space-click::before {
-			content: "" !important;
-			display: block !important;
-			position: absolute !important;
-			top: 50% !important;
-			left: 50% !important;
-			width: 5px !important;
-			height: 11px !important;
-			margin: 0 !important;
-			padding: 0 !important;
-			border: 0 !important;
-			border-right: 2px solid #fff !important;
-			border-bottom: 2px solid #fff !important;
-			background: transparent !important;
-			color: #fff !important;
-			transform: translate(-50%, -58%) rotate(45deg) !important;
-			transform-origin: center !important;
-		}
-
-		body .objective-table input[type="checkbox"].completion-checkbox + label.progressally-space-click::after {
-			content: none !important;
-			display: none !important;
-		}
-	</style>
-	<?php
-}
-add_action( 'wp_footer', 'jha_print_progressally_objective_final_overrides', 999 );
+add_action( 'wp_footer', 'jha_print_course_template_progressally_overrides', 999 );
 
 /**
  * SmartVideo conditionally loads its player script by scanning page content.

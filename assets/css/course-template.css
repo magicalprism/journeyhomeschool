@@ -78,6 +78,10 @@ body.et_fixed_nav.et_show_nav.et_secondary_nav_enabled:not(.et_transparent_nav):
 	list-style: none;
 }
 
+.jha-course-menu {
+	border-bottom: 1px solid #2f4867;
+}
+
 .jha-course-menu-item {
 	position: relative;
 	margin: 0;
@@ -218,7 +222,6 @@ body.et_fixed_nav.et_show_nav.et_secondary_nav_enabled:not(.et_transparent_nav):
 	gap: 0.5rem;
 	aspect-ratio: 1 / 1;
 	padding: 1.5rem;
-	border-top: 1px solid #2f4867;
 	color: #2f4867;
 	text-align: center;
 }
@@ -283,7 +286,7 @@ body.et_fixed_nav.et_show_nav.et_secondary_nav_enabled:not(.et_transparent_nav):
 }
 
 .jha-course-content a {
-	color: #2f4867;
+	color: #43a8a3;
 }
 
 .jha-course-content ul,
@@ -307,6 +310,27 @@ body.et_fixed_nav.et_show_nav.et_secondary_nav_enabled:not(.et_transparent_nav):
 	margin-top: 0.35em;
 }
 
+.jha-course-content .progressally-quiz-container {
+	background: transparent !important;
+	background-color: transparent !important;
+}
+
+.jha-course-content .progressally-quiz-display,
+.jha-course-content ul.progressally-quiz-display {
+	padding-left: 0 !important;
+	margin-left: 0 !important;
+	list-style: none !important;
+}
+
+.jha-course-content .progressally-quiz-choice-item {
+	margin: 5px 0 !important;
+	list-style: none !important;
+}
+
+.jha-course-content .progressally-quiz-choice-item::marker {
+	content: "" !important;
+}
+
 .jha-course-content input[type="radio"] {
 	margin-top: 0;
 	vertical-align: middle;
@@ -320,7 +344,57 @@ body.et_fixed_nav.et_show_nav.et_secondary_nav_enabled:not(.et_transparent_nav):
 }
 
 .jha-course-content .progressally-quiz-choice-input[type="radio"] {
-	top: -4px;
+	top: -1px !important;
+	margin-top: 0 !important;
+}
+
+.jha-course-content .progressally-quiz-choice-label {
+	display: inline-block;
+	line-height: 1.4;
+}
+
+/* Pass-requirement note above the quiz. */
+.jha-course-content .jha-quiz-notice,
+.jha-course-content .progressally-quiz-notice,
+.jha-course-content .quiz-notice,
+.jha-course-content :is(p, .wp-block-paragraph):has(+ .progressally-quiz-container),
+.jha-course-content :is(p, .wp-block-paragraph):has(+ :is(.wp-block-shortcode, [class*="progressally"]):has(.progressally-quiz-container)),
+.jha-course-content .wp-block-group:has(> .progressally-quiz-container) > :is(p, .wp-block-paragraph):last-of-type,
+.jha-course-content .wp-block-group:has(> :is(.wp-block-shortcode, [class*="progressally"]):has(.progressally-quiz-container)) > :is(p, .wp-block-paragraph):last-of-type {
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	padding: 12px 16px;
+	border-radius: 3px;
+	background: #eeeeee;
+	color: #2f4867;
+	font-size: 15px;
+	line-height: 1.4;
+}
+
+.jha-course-content .jha-quiz-notice::before,
+.jha-course-content .progressally-quiz-notice::before,
+.jha-course-content .quiz-notice::before,
+.jha-course-content :is(p, .wp-block-paragraph):has(+ .progressally-quiz-container)::before,
+.jha-course-content :is(p, .wp-block-paragraph):has(+ :is(.wp-block-shortcode, [class*="progressally"]):has(.progressally-quiz-container))::before,
+.jha-course-content .wp-block-group:has(> .progressally-quiz-container) > :is(p, .wp-block-paragraph):last-of-type::before,
+.jha-course-content .wp-block-group:has(> :is(.wp-block-shortcode, [class*="progressally"]):has(.progressally-quiz-container)) > :is(p, .wp-block-paragraph):last-of-type::before {
+	display: inline-grid;
+	flex: 0 0 22px;
+	width: 22px;
+	height: 22px;
+	border-radius: 999px;
+	background: #2f4867;
+	color: #fff;
+	content: "i";
+	font-family: Georgia, "Times New Roman", serif;
+	font-size: 15px;
+	font-style: italic;
+	font-weight: 700;
+	line-height: 1;
+	place-items: center;
 }
 
 .jha-course-content input[type="checkbox"],
@@ -397,6 +471,7 @@ body.et_fixed_nav.et_show_nav.et_secondary_nav_enabled:not(.et_transparent_nav):
 	min-width: 48px !important;
 	flex: 0 0 48px !important;
 	align-items: flex-start !important;
+	background-image: none !important;
 	padding: 10px 10px 6px !important;
 	vertical-align: top !important;
 }
