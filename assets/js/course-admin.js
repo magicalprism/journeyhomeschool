@@ -16,7 +16,9 @@
 		var $searchInput = $('#jha-course-lesson-search');
 		var $searchStatus = $('#jha-course-lesson-search-status');
 		var $courseSettingsBox = $('#jha-course-settings');
-		var courseTemplateSlug = 'page-templates/course-template.php';
+		var courseTemplateSlug = (window.jhaCourseAdmin && jhaCourseAdmin.courseTemplateSlug)
+			? jhaCourseAdmin.courseTemplateSlug
+			: 'page-templates/course-template.php';
 		var currentTemplate = '';
 		var renameObserver;
 		var renameTimeout;
@@ -351,6 +353,10 @@
 			updateTrashInput();
 			updateHiddenInput();
 
+			if (!isCourseTemplateSelected()) {
+				return;
+			}
+
 			if (!window.wp || !wp.data || !wp.data.dispatch) {
 				return;
 			}
@@ -364,7 +370,6 @@
 			wp.data.dispatch('core/editor').editPost({
 				meta: {
 					_jha_course_lesson_tree: $input.val() || '[]',
-					_jha_course_menu_tree: $input.val() || '[]',
 					_jha_course_new_child_pages: $newPagesInput.val() || '{}',
 					_jha_course_child_trash: $trashInput.val() || '',
 					_jha_course_hidden_lessons: $hiddenInput.val() || ''

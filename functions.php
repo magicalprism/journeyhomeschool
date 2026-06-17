@@ -7,6 +7,10 @@ require_once get_stylesheet_directory() . '/inc/course-menu.php';
 require_once get_stylesheet_directory() . '/inc/course-admin.php';
 require_once get_stylesheet_directory() . '/inc/button-icons.php';
 
+if ( defined( 'JHA_LESSON_META_DEBUG' ) && JHA_LESSON_META_DEBUG ) {
+	require_once get_stylesheet_directory() . '/inc/course-meta-debug.php';
+}
+
 /**
  * Ensure pages can use featured images for course sidebar logos.
  */
@@ -206,7 +210,7 @@ add_filter( 'render_block', 'jha_render_button_icon_block', 10, 2 );
  * Load the lightweight course template stylesheet only for pages that opt in.
  */
 function jha_enqueue_course_template_assets() {
-	if ( ! is_page_template( 'page-templates/course-template.php' ) ) {
+	if ( ! is_page_template( jha_get_course_template_slug() ) ) {
 		return;
 	}
 
@@ -259,7 +263,7 @@ add_action( 'wp_enqueue_scripts', 'jha_enqueue_course_template_assets', 20 );
  * so these rules are printed late in the head on course template pages.
  */
 function jha_print_course_template_progressally_overrides() {
-	if ( ! is_page_template( 'page-templates/course-template.php' ) ) {
+	if ( ! is_page_template( jha_get_course_template_slug() ) ) {
 		return;
 	}
 
@@ -499,7 +503,7 @@ add_filter( 'smartvideo_force_load_script', 'jha_force_smartvideo_on_course_temp
  * @return void
  */
 function jha_enqueue_smartvideo_block_styles_on_course_template() {
-	if ( ! is_page_template( 'page-templates/course-template.php' ) ) {
+	if ( ! is_page_template( jha_get_course_template_slug() ) ) {
 		return;
 	}
 
