@@ -85,7 +85,92 @@ function jha_page_is_in_course_template_system( $post_id ) {
 
 	$course_root_id = jha_get_course_parent_id( $post_id );
 
-	return $course_root_id > 0 && jha_page_has_course_template( $course_root_id );
+	if ( $course_root_id > 0 && jha_page_has_course_template( $course_root_id ) ) {
+		return true;
+	}
+
+	if ( $course_root_id === $post_id ) {
+		return jha_course_root_has_descendant_with_course_template( $post_id );
+	}
+
+	return false;
+}
+
+/**
+ * Whether any descendant page under a course root uses the JHA course template.
+ *
+ * @param int $course_root_id Top-level course page ID.
+ * @return bool
+ */
+function jha_course_root_has_descendant_with_course_template( $course_root_id ) {
+	static $cache = array();
+
+	$course_root_id = absint( $course_root_id );
+
+	if ( ! $course_root_id ) {
+		return false;
+	}
+
+	if ( isset( $cache[ $course_root_id ] ) ) {
+		return $cache[ $course_root_id ];
+	}
+
+	foreach (
+		get_pages(
+			array(
+				'child_of'    => $course_root_id,
+				'post_type'   => 'page',
+				'post_status' => 'publish',
+			)
+		) as $page
+	) {
+		if ( jha_page_has_course_template( $page->ID ) ) {
+			$cache[ $course_root_id ] = true;
+			return true;
+		}
+	}
+
+	$cache[ $course_root_id ] = false;
+
+	return false;
+}
+
+/**
+ * Resolve the AccessAlly offering key for a course root page.
+ *
+ * @param int $course_root_id Top-level course page ID.
+ * @return string Offering key, or empty string when unavailable.
+ */
+function jha_resolve_accessally_course_key_for_course_root( $course_root_id ) {
+	$course_root_id = absint( $course_root_id );
+
+	if ( ! $course_root_id ) {
+		return '';
+	}
+
+	$course_key = get_post_meta( $course_root_id, '_accessally_course_key', true );
+
+	if ( is_string( $course_key ) && 0 === strpos( $course_key, '_accessally_offering_' ) ) {
+		return $course_key;
+	}
+
+	if ( class_exists( 'AccessAllyWizardShared' ) ) {
+		$course_key = AccessAllyWizardShared::get_post_parent_offering_key( $course_root_id );
+
+		if ( is_string( $course_key ) && 0 === strpos( $course_key, '_accessally_offering_' ) ) {
+			return $course_key;
+		}
+	}
+
+	foreach ( jha_get_course_child_pages( $course_root_id, true ) as $child_page ) {
+		$course_key = get_post_meta( $child_page->ID, '_accessally_course_key', true );
+
+		if ( is_string( $course_key ) && 0 === strpos( $course_key, '_accessally_offering_' ) ) {
+			return $course_key;
+		}
+	}
+
+	return '';
 }
 
 /**
@@ -695,26 +780,39 @@ function jha_course_page_is_visible_in_menu( $post_id ) {
  * @return string Badge image HTML, or empty string if unavailable.
  */
 function jha_get_accessally_available_badge_html( $post_id ) {
-	$post_id = absint( $post_id );
+	$post_id        = absint( $post_id );
+	$course_root_id = jha_get_course_parent_id( $post_id );
 
-	if ( ! $post_id ) {
+	if ( ! $post_id || ! $course_root_id ) {
 		return '';
 	}
 
 	$badge_url = '';
 
 	if ( class_exists( 'AccessAllyPostPermission' ) ) {
-		$permission = AccessAllyPostPermission::get_post_permission( $post_id );
+		$permission = AccessAllyPostPermission::get_post_permission( $course_root_id );
 	} else {
-		$permission = get_post_meta( $post_id, '_accessally_post_permission', true );
+		$permission = get_post_meta( $course_root_id, '_accessally_post_permission', true );
 	}
 
 	if ( is_array( $permission ) && ! empty( $permission['enable-url'] ) && is_string( $permission['enable-url'] ) ) {
 		$badge_url = $permission['enable-url'];
 	}
 
-	if ( '' === trim( $badge_url ) && jha_page_is_in_course_template_system( $post_id ) && function_exists( 'jha_get_accessally_offering_for_course_root' ) ) {
-		$offering = jha_get_accessally_offering_for_course_root( $post_id );
+	if ( '' === trim( $badge_url ) && $post_id !== $course_root_id ) {
+		if ( class_exists( 'AccessAllyPostPermission' ) ) {
+			$permission = AccessAllyPostPermission::get_post_permission( $post_id );
+		} else {
+			$permission = get_post_meta( $post_id, '_accessally_post_permission', true );
+		}
+
+		if ( is_array( $permission ) && ! empty( $permission['enable-url'] ) && is_string( $permission['enable-url'] ) ) {
+			$badge_url = $permission['enable-url'];
+		}
+	}
+
+	if ( '' === trim( $badge_url ) && jha_page_is_in_course_template_system( $course_root_id ) && function_exists( 'jha_get_accessally_offering_for_course_root' ) ) {
+		$offering = jha_get_accessally_offering_for_course_root( $course_root_id );
 
 		if (
 			is_array( $offering ) &&
@@ -725,11 +823,11 @@ function jha_get_accessally_available_badge_html( $post_id ) {
 		}
 	}
 
-	if ( '' === trim( $badge_url ) && jha_page_is_in_course_template_system( $post_id ) && function_exists( 'jha_get_course_navigation_pages' ) ) {
-		foreach ( jha_get_course_navigation_pages( $post_id, true ) as $course_page ) {
+	if ( '' === trim( $badge_url ) && jha_page_is_in_course_template_system( $course_root_id ) && function_exists( 'jha_get_course_navigation_pages' ) ) {
+		foreach ( jha_get_course_navigation_pages( $course_root_id, true, false ) as $course_page ) {
 			$page_id = absint( $course_page->ID );
 
-			if ( ! $page_id || $page_id === $post_id ) {
+			if ( ! $page_id ) {
 				continue;
 			}
 
@@ -753,7 +851,7 @@ function jha_get_accessally_available_badge_html( $post_id ) {
 	return sprintf(
 		'<img class="jha-course-logo-image" src="%s" alt="%s">',
 		esc_url( $badge_url ),
-		esc_attr( get_the_title( $post_id ) )
+		esc_attr( get_the_title( $course_root_id ) )
 	);
 }
 

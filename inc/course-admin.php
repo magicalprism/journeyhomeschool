@@ -579,12 +579,84 @@ function jha_get_course_admin_lesson_tree( $post_id ) {
 
 	if ( is_array( $decoded ) ) {
 		$stored_tree = jha_sanitize_course_lesson_tree_nodes( $decoded );
-		$page_ids    = jha_get_course_lesson_tree_page_ids( $stored_tree );
 
-		return array_merge( $stored_tree, jha_build_course_lesson_tree( $post_id, $page_ids ) );
+		if ( ! empty( $stored_tree ) ) {
+			return $stored_tree;
+		}
 	}
 
 	return jha_build_course_lesson_tree( $post_id );
+}
+
+/**
+ * Remove duplicate lesson nodes from a tree by token.
+ *
+ * @param array $nodes Lesson tree nodes.
+ * @return array<int, array<string, mixed>>
+ */
+function jha_deduplicate_course_lesson_tree_nodes( $nodes ) {
+	$deduped = array();
+	$seen    = array();
+
+	foreach ( $nodes as $node ) {
+		if ( ! is_array( $node ) || ! isset( $node['token'] ) ) {
+			continue;
+		}
+
+		$token = sanitize_key( (string) $node['token'] );
+
+		if ( '' === $token || isset( $seen[ $token ] ) ) {
+			continue;
+		}
+
+		$seen[ $token ] = true;
+
+		if ( ! empty( $node['children'] ) && is_array( $node['children'] ) ) {
+			$node['children'] = jha_deduplicate_course_lesson_tree_nodes( $node['children'] );
+		}
+
+		$deduped[] = $node;
+	}
+
+	return $deduped;
+}
+
+/**
+ * Ensure every pending new-page token appears in the lesson tree.
+ *
+ * @param array $lesson_tree Saved lesson tree nodes.
+ * @param array $new_pages   Pending new page definitions keyed by token.
+ * @return array<int, array<string, mixed>>
+ */
+function jha_merge_new_pages_into_lesson_tree( $lesson_tree, $new_pages ) {
+	if ( empty( $new_pages ) ) {
+		return is_array( $lesson_tree ) ? $lesson_tree : array();
+	}
+
+	$lesson_tree = is_array( $lesson_tree ) ? $lesson_tree : array();
+	$tokens      = array();
+
+	foreach ( $lesson_tree as $node ) {
+		if ( is_array( $node ) && isset( $node['token'] ) ) {
+			$tokens[ sanitize_key( (string) $node['token'] ) ] = true;
+		}
+	}
+
+	foreach ( array_keys( $new_pages ) as $token ) {
+		$clean_token = sanitize_key( (string) $token );
+
+		if ( '' === $clean_token || isset( $tokens[ $clean_token ] ) ) {
+			continue;
+		}
+
+		$lesson_tree[] = array(
+			'token'    => $clean_token,
+			'children' => array(),
+		);
+		$tokens[ $clean_token ] = true;
+	}
+
+	return $lesson_tree;
 }
 
 /**
@@ -772,9 +844,9 @@ function jha_render_course_child_order_node( $node ) {
  * @return void
  */
 function jha_render_course_child_order_meta_box( $post ) {
-	$children           = jha_get_course_admin_lesson_tree( $post->ID );
-	$screen             = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
-	$is_course_template = jha_page_has_course_template( $post );
+	$children                  = jha_get_course_admin_lesson_tree( $post->ID );
+	$screen                    = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+	$show_course_settings = jha_page_is_in_course_template_system( $post->ID );
 	?>
 	<p>
 		<?php esc_html_e( 'Drag pages to reorder them, or drag them into another page to create nested lesson menu items. Use Hide to remove a lesson from the course menu while keeping the page published on the site. Use Trash only when you want to move the page itself to the WordPress Trash and remove it from the site.', 'journey-homeschool-academy' ); ?>
@@ -863,7 +935,7 @@ function jha_render_course_child_order_meta_box( $post ) {
 			align-items: start;
 		}
 
-		<?php if ( ! $is_course_template ) : ?>
+		<?php if ( ! $show_course_settings ) : ?>
 		#jha-course-settings {
 			display: none;
 		}
@@ -1123,6 +1195,8 @@ function jha_resume_ally_lesson_save_hooks() {
  * @return array<int, array<string, mixed>> Saved tree nodes.
  */
 function jha_save_course_lesson_tree( $nodes, $parent_id, $course_root_id, $new_pages, $template_slug ) {
+	static $created_tokens = array();
+
 	$saved_nodes = array();
 
 	if ( function_exists( 'jha_lesson_meta_debug_log' ) ) {
@@ -1163,7 +1237,9 @@ function jha_save_course_lesson_tree( $nodes, $parent_id, $course_root_id, $new_
 			continue;
 		}
 
-		if ( isset( $new_pages[ $token ] ) || isset( $new_pages[ $raw_token ] ) ) {
+		if ( isset( $created_tokens[ $token ] ) || isset( $created_tokens[ $raw_token ] ) ) {
+			$page_id = $created_tokens[ $token ] ?? $created_tokens[ $raw_token ];
+		} elseif ( isset( $new_pages[ $token ] ) || isset( $new_pages[ $raw_token ] ) ) {
 			$new_page_data = $new_pages[ $token ] ?? $new_pages[ $raw_token ];
 			$new_title     = is_array( $new_page_data ) && isset( $new_page_data['title'] )
 				? $new_page_data['title']
@@ -1196,6 +1272,10 @@ function jha_save_course_lesson_tree( $nodes, $parent_id, $course_root_id, $new_
 			}
 
 			jha_sync_new_lesson_to_accessally_offering( $page_id, $parent_id, $course_root_id, $new_title );
+
+			$created_tokens[ $token ]     = $page_id;
+			$created_tokens[ $raw_token ]  = $page_id;
+			unset( $new_pages[ $token ], $new_pages[ $raw_token ] );
 		} else {
 			$page_id = absint( $raw_token );
 
@@ -1247,15 +1327,15 @@ function jha_save_course_lesson_tree( $nodes, $parent_id, $course_root_id, $new_
  * @return array{key:string,settings:array<string,mixed>}|false
  */
 function jha_get_accessally_offering_for_course_root( $course_root_id ) {
-	$course_root_id = absint( $course_root_id );
+	$course_root_id = absint( jha_get_course_parent_id( absint( $course_root_id ) ) );
 
 	if ( ! $course_root_id || ! jha_page_is_in_course_template_system( $course_root_id ) || ! class_exists( 'AccessAllyOfferings' ) ) {
 		return false;
 	}
 
-	$course_key = get_post_meta( $course_root_id, '_accessally_course_key', true );
+	$course_key = jha_resolve_accessally_course_key_for_course_root( $course_root_id );
 
-	if ( is_string( $course_key ) && 0 === strpos( $course_key, '_accessally_offering_' ) ) {
+	if ( $course_key ) {
 		$offering_settings = AccessAllyOfferings::get_offering_settings( $course_key );
 
 		if ( is_array( $offering_settings ) ) {
@@ -1265,6 +1345,16 @@ function jha_get_accessally_offering_for_course_root( $course_root_id ) {
 			);
 		}
 	}
+
+	$course_page_ids = array( $course_root_id );
+
+	if ( function_exists( 'jha_get_course_navigation_pages' ) ) {
+		foreach ( jha_get_course_navigation_pages( $course_root_id, true, false ) as $course_page ) {
+			$course_page_ids[] = absint( $course_page->ID );
+		}
+	}
+
+	$course_page_ids = array_values( array_unique( array_filter( $course_page_ids ) ) );
 
 	foreach ( AccessAllyOfferings::get_all_offering_settings() as $offering_key => $offering_settings ) {
 		if ( 0 !== strpos( (string) $offering_key, '_accessally_offering_' ) || empty( $offering_settings['pages'] ) || ! is_array( $offering_settings['pages'] ) ) {
@@ -1276,7 +1366,7 @@ function jha_get_accessally_offering_for_course_root( $course_root_id ) {
 				continue;
 			}
 
-			if ( absint( $page_settings['page-template-select'] ) === $course_root_id ) {
+			if ( in_array( absint( $page_settings['page-template-select'] ), $course_page_ids, true ) ) {
 				return array(
 					'key'      => (string) $offering_key,
 					'settings' => $offering_settings,
@@ -1406,6 +1496,30 @@ function jha_sync_new_lesson_to_accessally_offering( $page_id, $parent_id, $cour
 }
 
 /**
+ * Whether a page has lesson-manager state waiting to be processed.
+ *
+ * @param int $post_id Page ID.
+ * @return bool
+ */
+function jha_course_page_has_pending_lesson_manager_state( $post_id ) {
+	$post_id = absint( $post_id );
+
+	if ( ! $post_id ) {
+		return false;
+	}
+
+	$lesson_tree = get_post_meta( $post_id, '_jha_course_lesson_tree', true );
+	$new_pages   = get_post_meta( $post_id, '_jha_course_new_child_pages', true );
+	$trash       = get_post_meta( $post_id, '_jha_course_child_trash', true );
+	$hidden      = get_post_meta( $post_id, '_jha_course_hidden_lessons', true );
+
+	return ( is_string( $lesson_tree ) && '' !== $lesson_tree && '[]' !== $lesson_tree )
+		|| ( is_string( $new_pages ) && '' !== $new_pages && '{}' !== $new_pages )
+		|| ( is_string( $trash ) && '' !== $trash )
+		|| ( is_string( $hidden ) && '' !== $hidden );
+}
+
+/**
  * Save course menu label and direct child page order.
  *
  * @param int $post_id Current page ID.
@@ -1448,7 +1562,7 @@ function jha_save_course_page_settings( $post_id ) {
 
 	if ( $has_settings_nonce ) {
 		// Menu settings only save from the classic/meta box POST request.
-	} elseif ( ! $is_primary_editor_save || ! get_post_meta( $post_id, '_jha_course_lesson_tree', true ) ) {
+	} elseif ( ! $is_primary_editor_save || ! jha_course_page_has_pending_lesson_manager_state( $post_id ) ) {
 		return;
 	}
 
@@ -1496,6 +1610,11 @@ function jha_save_course_page_settings( $post_id ) {
 	}
 
 	if ( ! jha_page_is_in_course_template_system( $post_id ) ) {
+		return;
+	}
+
+	// Block editor saves lesson manager state after REST meta via rest_after_insert_page.
+	if ( ! $has_settings_nonce && defined( 'REST_REQUEST' ) && REST_REQUEST ) {
 		return;
 	}
 
@@ -1607,14 +1726,8 @@ function jha_save_course_page_settings( $post_id ) {
 		}
 	}
 
-	if ( empty( $lesson_tree ) && ! empty( $new_pages ) ) {
-		foreach ( array_keys( $new_pages ) as $token ) {
-			$lesson_tree[] = array(
-				'token'    => $token,
-				'children' => array(),
-			);
-		}
-	}
+	$lesson_tree = jha_merge_new_pages_into_lesson_tree( $lesson_tree, $new_pages );
+	$lesson_tree = jha_deduplicate_course_lesson_tree_nodes( $lesson_tree );
 
 	if ( empty( $lesson_tree ) && empty( $new_pages ) && '' === $trash_raw && '' === $hidden_raw ) {
 		return;
@@ -1628,6 +1741,10 @@ function jha_save_course_page_settings( $post_id ) {
 	}
 
 	$processed_lesson_trees[ $post_id ] = true;
+
+	if ( ! empty( $new_pages ) ) {
+		update_post_meta( $post_id, '_jha_course_lesson_manager_reload', '1' );
+	}
 
 	jha_pause_ally_lesson_save_hooks();
 	remove_action( 'save_post_page', 'jha_save_course_page_settings' );
@@ -1659,6 +1776,25 @@ function jha_save_course_page_settings( $post_id ) {
 	jha_resume_ally_lesson_save_hooks();
 }
 add_action( 'save_post_page', 'jha_save_course_page_settings' );
+
+/**
+ * Process lesson-manager saves after block editor REST meta is stored.
+ *
+ * @param WP_Post         $post Saved page.
+ * @param WP_REST_Request $request REST request.
+ * @param bool            $creating Whether this created a new page.
+ * @return void
+ */
+function jha_rest_save_course_page_settings( $post, $request, $creating ) {
+	unset( $request, $creating );
+
+	if ( ! $post instanceof WP_Post || 'page' !== $post->post_type ) {
+		return;
+	}
+
+	jha_save_course_page_settings( $post->ID );
+}
+add_action( 'rest_after_insert_page', 'jha_rest_save_course_page_settings', 10, 3 );
 
 /**
  * Add a quick menu-label override action to Course Template pages in the Pages list.
@@ -1733,38 +1869,91 @@ function jha_ajax_update_course_menu_label() {
 add_action( 'wp_ajax_jha_update_course_menu_label', 'jha_ajax_update_course_menu_label' );
 
 /**
+ * Tell the block editor when a lesson-manager save created new child pages.
+ *
+ * @return void
+ */
+function jha_ajax_course_lesson_manager_needs_reload() {
+	check_ajax_referer( 'jha_course_admin', 'nonce' );
+
+	$post_id = isset( $_POST['postId'] ) ? absint( wp_unslash( $_POST['postId'] ) ) : 0;
+
+	if ( ! $post_id || ! current_user_can( 'edit_page', $post_id ) ) {
+		wp_send_json_error();
+	}
+
+	$needs_reload = '1' === get_post_meta( $post_id, '_jha_course_lesson_manager_reload', true );
+
+	if ( $needs_reload ) {
+		delete_post_meta( $post_id, '_jha_course_lesson_manager_reload' );
+	}
+
+	wp_send_json_success(
+		array(
+			'reload' => $needs_reload,
+		)
+	);
+}
+add_action( 'wp_ajax_jha_course_lesson_manager_needs_reload', 'jha_ajax_course_lesson_manager_needs_reload' );
+
+/**
  * Load admin sorting behavior only on the page editor.
  *
  * @param string $hook_suffix Current admin screen.
  * @return void
  */
 function jha_enqueue_course_admin_assets( $hook_suffix = '' ) {
+	static $localized = false;
+
 	$screen = get_current_screen();
 
 	if ( ! $screen || 'page' !== $screen->post_type ) {
 		return;
 	}
 
-	if ( 'post.php' !== $hook_suffix && 'post-new.php' !== $hook_suffix && 'edit.php' !== $hook_suffix && 'page' !== $screen->base ) {
+	if (
+		'post.php' !== $hook_suffix &&
+		'post-new.php' !== $hook_suffix &&
+		'edit.php' !== $hook_suffix &&
+		'post' !== $screen->base &&
+		'page' !== $screen->base
+	) {
 		return;
 	}
 
 	wp_enqueue_script( 'jquery-ui-sortable' );
+	$course_admin_script_path = get_stylesheet_directory() . '/assets/js/course-admin.js';
 	wp_enqueue_script(
 		'jha-course-admin',
 		get_stylesheet_directory_uri() . '/assets/js/course-admin.js',
 		array( 'jquery', 'jquery-ui-sortable', 'wp-hooks', 'wp-data' ),
-		wp_get_theme()->get( 'Version' ),
+		file_exists( $course_admin_script_path ) ? (string) filemtime( $course_admin_script_path ) : wp_get_theme()->get( 'Version' ),
 		true
 	);
+
+	if ( $localized ) {
+		return;
+	}
+
+	$localized = true;
+	global $post;
+
+	$current_post_id = ( $post instanceof WP_Post ) ? absint( $post->ID ) : 0;
+
+	if ( ! $current_post_id && isset( $_GET['post'] ) ) {
+		$current_post_id = absint( wp_unslash( $_GET['post'] ) );
+	}
+
 	wp_localize_script(
 		'jha-course-admin',
 		'jhaCourseAdmin',
 		array(
-			'ajaxUrl'              => admin_url( 'admin-ajax.php' ),
-			'nonce'                => wp_create_nonce( 'jha_course_admin' ),
-			'courseTemplateSlug'   => jha_get_course_template_slug(),
-			'i18n'                 => array(
+			'ajaxUrl'                    => admin_url( 'admin-ajax.php' ),
+			'nonce'                      => wp_create_nonce( 'jha_course_admin' ),
+			'postId'                     => $current_post_id,
+			'courseTemplateSlug'         => jha_get_course_template_slug(),
+			'isInCourseTemplateSystem'   => $current_post_id ? jha_page_is_in_course_template_system( $current_post_id ) : false,
+			'i18n'                       => array(
 				'menuLabelPrompt' => __( 'Enter the course menu label override. Leave blank to use the page title.', 'journey-homeschool-academy' ),
 				'saveFailed'      => __( 'The course menu label could not be saved.', 'journey-homeschool-academy' ),
 			),
