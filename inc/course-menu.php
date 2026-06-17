@@ -105,7 +105,7 @@ function jha_get_course_menu_tree( $course_parent_id, $include_hidden = false, $
 
 	if ( is_array( $decoded_tree ) ) {
 		$prepared_tree = jha_prepare_course_menu_tree_nodes( $decoded_tree, $include_hidden, $filter_access );
-		$tracked_ids   = jha_get_course_menu_tree_page_ids( $prepared_tree );
+		$tracked_ids   = jha_collect_course_menu_tree_page_ids_from_raw_nodes( $decoded_tree );
 
 		return array_merge(
 			$prepared_tree,
@@ -161,11 +161,11 @@ function jha_prepare_course_menu_tree_nodes( $nodes, $include_hidden = false, $f
 			continue;
 		}
 
-		if ( ! $include_hidden && jha_course_page_is_hidden_from_menu( $page_id ) ) {
+		if ( $filter_access && ! jha_course_page_is_visible_in_menu( $page_id ) ) {
 			continue;
 		}
 
-		if ( $filter_access && ! jha_user_can_access_course_page( $page_id ) ) {
+		if ( ! $filter_access && ! $include_hidden && jha_course_page_is_hidden_from_menu( $page_id ) ) {
 			continue;
 		}
 
@@ -178,6 +178,49 @@ function jha_prepare_course_menu_tree_nodes( $nodes, $include_hidden = false, $f
 	}
 
 	return $prepared;
+}
+
+/**
+ * Collect page IDs from a raw saved menu tree before access filtering.
+ *
+ * Tracking the full saved tree prevents pages from reappearing through the
+ * WordPress hierarchy merge under a different parent branch.
+ *
+ * @param array $nodes Raw menu tree nodes.
+ * @return int[]
+ */
+function jha_collect_course_menu_tree_page_ids_from_raw_nodes( $nodes ) {
+	$page_ids = array();
+
+	if ( ! is_array( $nodes ) ) {
+		return $page_ids;
+	}
+
+	foreach ( $nodes as $node ) {
+		if ( ! is_array( $node ) || empty( $node['token'] ) ) {
+			continue;
+		}
+
+		$token = (string) $node['token'];
+		$type  = isset( $node['type'] ) ? sanitize_key( (string) $node['type'] ) : '';
+
+		if ( 'menu' !== $type && 0 !== strpos( $token, 'menu-' ) ) {
+			$page_id = absint( $token );
+
+			if ( $page_id ) {
+				$page_ids[] = $page_id;
+			}
+		}
+
+		if ( ! empty( $node['children'] ) && is_array( $node['children'] ) ) {
+			$page_ids = array_merge(
+				$page_ids,
+				jha_collect_course_menu_tree_page_ids_from_raw_nodes( $node['children'] )
+			);
+		}
+	}
+
+	return array_values( array_unique( array_filter( $page_ids ) ) );
 }
 
 /**
@@ -219,7 +262,7 @@ function jha_build_course_menu_tree_from_pages( $parent_id, $include_hidden = fa
 			continue;
 		}
 
-		if ( $filter_access && ! jha_user_can_access_course_page( $child->ID ) ) {
+		if ( $filter_access && ! jha_course_page_is_visible_in_menu( $child->ID ) ) {
 			continue;
 		}
 
@@ -354,9 +397,173 @@ function jha_should_show_course_progress( $post_id ) {
 }
 
 /**
- * Whether the current user can access a course page through AccessAlly.
+ * Get AccessAlly offering context for a specific page/post ID.
+ *
+ * Never uses the WordPress parent page ID. The lookup is always keyed to the
+ * menu item / lesson page being evaluated.
  *
  * @param int $post_id Page ID.
+ * @return array<string, mixed>|false
+ */
+function jha_get_accessally_offering_page_context( $post_id ) {
+	$post_id = absint( $post_id );
+
+	if ( ! $post_id || ! class_exists( 'AccessAllyWizardShared' ) || ! class_exists( 'AccessAllyOfferings' ) ) {
+		return false;
+	}
+
+	$course_key = AccessAllyWizardShared::get_post_parent_offering_key( $post_id );
+
+	if ( empty( $course_key ) ) {
+		return false;
+	}
+
+	$offering_settings = AccessAllyOfferings::get_offering_settings( $course_key );
+
+	if ( empty( $offering_settings['pages'] ) || ! is_array( $offering_settings['pages'] ) ) {
+		return false;
+	}
+
+	foreach ( $offering_settings['pages'] as $page_ordinal => $page_settings ) {
+		if ( ! is_array( $page_settings ) || empty( $page_settings['page-template-select'] ) ) {
+			continue;
+		}
+
+		if ( absint( $page_settings['page-template-select'] ) === $post_id ) {
+			return array(
+				'course_key'        => $course_key,
+				'offering_settings' => $offering_settings,
+				'page_ordinal'      => $page_ordinal,
+				'page_settings'     => $page_settings,
+			);
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Get required AccessAlly tags for one offering page ordinal.
+ *
+ * Mirrors AccessAllyOfferings::generate_individual_page_required_permission_tags()
+ * so menu access can be evaluated per lesson page ID.
+ *
+ * @param array<string, mixed> $offering_settings Offering settings.
+ * @param int|string           $page_ordinal Offering page ordinal.
+ * @return int[]
+ */
+function jha_get_accessally_offering_required_tag_ids( $offering_settings, $page_ordinal ) {
+	if ( empty( $offering_settings ) || ! is_array( $offering_settings ) ) {
+		return array();
+	}
+
+	if ( empty( $offering_settings['pages'][ $page_ordinal ] ) || ! is_array( $offering_settings['pages'][ $page_ordinal ] ) ) {
+		return array();
+	}
+
+	$page_settings  = $offering_settings['pages'][ $page_ordinal ];
+	$page_module_id = $page_settings['module'] ?? '';
+	$required_tags  = array();
+
+	if ( class_exists( 'AccessAllyOfferings' ) && method_exists( 'AccessAllyOfferings', 'get_configured_tag_value' ) ) {
+		$instant_access_tag_id = AccessAllyOfferings::get_configured_tag_value( $offering_settings['tags']['instant'] ?? array() );
+
+		if ( $instant_access_tag_id ) {
+			$required_tags[] = $instant_access_tag_id;
+		}
+
+		$module_specific_permission_tag = false;
+
+		if ( '0' !== (string) $page_module_id ) {
+			$tag_key = 'module-' . $page_module_id;
+
+			if ( isset( $offering_settings['tags'][ $tag_key ] ) ) {
+				$module_specific_permission_tag = AccessAllyOfferings::get_configured_tag_value( $offering_settings['tags'][ $tag_key ] );
+			}
+		}
+
+		$base_access_tag = AccessAllyOfferings::get_configured_tag_value( $offering_settings['tags']['base'] ?? array() );
+
+		if ( empty( $module_specific_permission_tag ) ) {
+			if ( ! empty( $base_access_tag ) ) {
+				$required_tags[] = $base_access_tag;
+			}
+		} else {
+			$required_tags[] = $module_specific_permission_tag;
+		}
+	}
+
+	return array_values( array_unique( array_filter( array_map( 'absint', $required_tags ) ) ) );
+}
+
+/**
+ * Get forbidden AccessAlly tags for an offering.
+ *
+ * @param array<string, mixed> $offering_settings Offering settings.
+ * @return int[]
+ */
+function jha_get_accessally_offering_forbidden_tag_ids( $offering_settings ) {
+	if ( empty( $offering_settings ) || ! is_array( $offering_settings ) ) {
+		return array();
+	}
+
+	if ( ! class_exists( 'AccessAllyOfferings' ) || ! method_exists( 'AccessAllyOfferings', 'get_configured_tag_value' ) ) {
+		return array();
+	}
+
+	$revoke_tag_id = AccessAllyOfferings::get_configured_tag_value( $offering_settings['tags']['revoke'] ?? array() );
+
+	return $revoke_tag_id ? array( absint( $revoke_tag_id ) ) : array();
+}
+
+/**
+ * Whether a user matches AccessAlly required/forbidden tag rules.
+ *
+ * @param int[] $required_tag_ids Required tag IDs.
+ * @param int[] $forbidden_tag_ids Forbidden tag IDs.
+ * @param int   $user_id User ID.
+ * @return bool
+ */
+function jha_user_matches_accessally_tag_rules( $required_tag_ids, $forbidden_tag_ids, $user_id ) {
+	if ( ! class_exists( 'AccessAllyUserPermission' ) ) {
+		return true;
+	}
+
+	$user_tags = AccessAllyUserPermission::get_cleaned_user_tags( $user_id );
+
+	if ( ! is_array( $user_tags ) ) {
+		return false;
+	}
+
+	$required_tag_ids  = array_values( array_filter( array_map( 'absint', (array) $required_tag_ids ) ) );
+	$forbidden_tag_ids = array_values( array_filter( array_map( 'absint', (array) $forbidden_tag_ids ) ) );
+
+	if ( ! empty( $required_tag_ids ) ) {
+		$common_tags = array_intersect( $user_tags['clean'], $required_tag_ids );
+
+		if ( empty( $common_tags ) ) {
+			return false;
+		}
+	}
+
+	if ( ! empty( $forbidden_tag_ids ) ) {
+		$common_tags = array_intersect( $user_tags['clean'], $forbidden_tag_ids );
+
+		if ( ! empty( $common_tags ) ) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+/**
+ * Whether the current user can access a course page through AccessAlly.
+ *
+ * Always evaluates the passed page/post ID for that specific lesson or menu
+ * item. Parent/module page IDs must never be substituted here.
+ *
+ * @param int $post_id Page ID for the menu item or lesson being checked.
  * @return bool
  */
 function jha_user_can_access_course_page( $post_id ) {
@@ -366,11 +573,41 @@ function jha_user_can_access_course_page( $post_id ) {
 		return false;
 	}
 
-	if ( class_exists( 'AccessAlly' ) && method_exists( 'AccessAlly', 'can_current_user_read' ) ) {
-		return (bool) AccessAlly::can_current_user_read( $post_id );
+	if ( ! class_exists( 'AccessAlly' ) || ! method_exists( 'AccessAlly', 'can_current_user_read' ) ) {
+		return true;
 	}
 
-	return true;
+	$user_id = class_exists( 'AccessAllyBackendShared' )
+		? AccessAllyBackendShared::get_current_user_id()
+		: get_current_user_id();
+
+	if ( class_exists( 'AccessAllyUserPermission' ) && AccessAllyUserPermission::can_user_access_all_posts( $user_id ) ) {
+		return true;
+	}
+
+	$permission = class_exists( 'AccessAllyPostPermission' )
+		? AccessAllyPostPermission::get_post_permission( $post_id )
+		: array();
+
+	if ( is_array( $permission ) && 'yes' === ( $permission['require-login'] ?? 'no' ) ) {
+		return (bool) AccessAlly::can_current_user_read( $post_id, $user_id );
+	}
+
+	$offering_context = jha_get_accessally_offering_page_context( $post_id );
+
+	if ( $offering_context ) {
+		$required_tag_ids = jha_get_accessally_offering_required_tag_ids(
+			$offering_context['offering_settings'],
+			$offering_context['page_ordinal']
+		);
+		$forbidden_tag_ids = jha_get_accessally_offering_forbidden_tag_ids( $offering_context['offering_settings'] );
+
+		if ( ! empty( $required_tag_ids ) || ! empty( $forbidden_tag_ids ) ) {
+			return jha_user_matches_accessally_tag_rules( $required_tag_ids, $forbidden_tag_ids, $user_id );
+		}
+	}
+
+	return (bool) AccessAlly::can_current_user_read( $post_id, $user_id );
 }
 
 /**
@@ -666,7 +903,12 @@ add_action( 'wp_ajax_nopriv_jha_get_course_progress_tracker', 'jha_ajax_get_cour
  * @return void
  */
 function jha_render_course_menu_item( $page, $current_post_id, $current_ancestors ) {
-	$page_id      = absint( $page->ID );
+	$page_id = absint( $page->ID );
+
+	if ( ! jha_course_page_is_visible_in_menu( $page_id ) ) {
+		return;
+	}
+
 	$children     = jha_get_course_child_pages( $page_id );
 	$is_active    = ( $page_id === absint( $current_post_id ) );
 	$is_ancestor  = in_array( $page_id, $current_ancestors, true );
@@ -777,7 +1019,12 @@ function jha_render_course_menu_node( $node, $current_post_id, $current_ancestor
 	$should_be_expanded = $has_children && $contains_current;
 
 	if ( 'page' === $node['type'] && ! empty( $node['page'] ) && $node['page'] instanceof WP_Post ) {
-		$page_id     = absint( $node['page']->ID );
+		$page_id = absint( $node['page']->ID );
+
+		if ( ! jha_course_page_is_visible_in_menu( $page_id ) ) {
+			return;
+		}
+
 		$is_active   = ( $page_id === absint( $current_post_id ) );
 		$is_ancestor = in_array( $page_id, $current_ancestors, true );
 
