@@ -221,6 +221,36 @@ function jha_get_course_child_pages( $parent_id, $include_hidden = false ) {
 }
 
 /**
+ * Get all published descendant page IDs under a course root.
+ *
+ * @param int $course_root_id Top-level course page ID.
+ * @return int[]
+ */
+function jha_get_course_publish_descendant_page_ids( $course_root_id ) {
+	$course_root_id = absint( $course_root_id );
+
+	if ( ! $course_root_id ) {
+		return array();
+	}
+
+	$page_ids = array();
+
+	foreach (
+		get_pages(
+			array(
+				'child_of'    => $course_root_id,
+				'post_type'   => 'page',
+				'post_status' => 'publish',
+			)
+		) as $page
+	) {
+		$page_ids[] = absint( $page->ID );
+	}
+
+	return array_values( array_unique( array_filter( $page_ids ) ) );
+}
+
+/**
  * Get the sidebar menu label for a page.
  *
  * Admins can override the label from the page editor without changing the
@@ -259,13 +289,7 @@ function jha_get_course_menu_tree( $course_parent_id, $include_hidden = false, $
 	$decoded_tree     = is_string( $stored_tree ) && '' !== $stored_tree ? json_decode( $stored_tree, true ) : null;
 
 	if ( is_array( $decoded_tree ) ) {
-		$prepared_tree = jha_prepare_course_menu_tree_nodes( $decoded_tree, $include_hidden, $filter_access );
-		$tracked_ids   = jha_collect_course_menu_tree_page_ids_from_raw_nodes( $decoded_tree );
-
-		return array_merge(
-			$prepared_tree,
-			jha_build_course_menu_tree_from_pages( $course_parent_id, $include_hidden, $tracked_ids, $filter_access )
-		);
+		return jha_prepare_course_menu_tree_nodes( $decoded_tree, $include_hidden, $filter_access, $course_parent_id );
 	}
 
 	return jha_build_course_menu_tree_from_pages( $course_parent_id, $include_hidden, array(), $filter_access );
@@ -277,10 +301,12 @@ function jha_get_course_menu_tree( $course_parent_id, $include_hidden = false, $
  * @param array $nodes Raw tree nodes.
  * @param bool  $include_hidden Whether to include pages hidden from the course menu.
  * @param bool  $filter_access Whether to exclude pages the current user cannot access.
+ * @param int   $course_root_id Top-level course page ID.
  * @return array<int, array<string, mixed>>
  */
-function jha_prepare_course_menu_tree_nodes( $nodes, $include_hidden = false, $filter_access = true ) {
-	$prepared = array();
+function jha_prepare_course_menu_tree_nodes( $nodes, $include_hidden = false, $filter_access = true, $course_root_id = 0 ) {
+	$prepared       = array();
+	$course_root_id = absint( $course_root_id );
 
 	foreach ( $nodes as $node ) {
 		if ( ! is_array( $node ) || empty( $node['token'] ) ) {
@@ -290,19 +316,24 @@ function jha_prepare_course_menu_tree_nodes( $nodes, $include_hidden = false, $f
 		$token    = (string) $node['token'];
 		$type     = isset( $node['type'] ) ? sanitize_key( (string) $node['type'] ) : '';
 		$children = isset( $node['children'] ) && is_array( $node['children'] )
-			? jha_prepare_course_menu_tree_nodes( $node['children'], $include_hidden, $filter_access )
+			? jha_prepare_course_menu_tree_nodes( $node['children'], $include_hidden, $filter_access, $course_root_id )
 			: array();
 
 		if ( 'menu' === $type || 0 === strpos( $token, 'menu-' ) ) {
-			$title = isset( $node['title'] ) ? sanitize_text_field( (string) $node['title'] ) : '';
+			$title      = isset( $node['title'] ) ? sanitize_text_field( (string) $node['title'] ) : '';
+			$menu_token = sanitize_key( $token );
 
-			if ( '' === $title || ( $filter_access && empty( $children ) ) ) {
+			if ( '' === $title ) {
+				continue;
+			}
+
+			if ( ! $include_hidden && $course_root_id && jha_course_menu_item_is_hidden( $menu_token, $course_root_id ) ) {
 				continue;
 			}
 
 			$prepared[] = array(
 				'type'     => 'menu',
-				'token'    => sanitize_key( $token ),
+				'token'    => $menu_token,
 				'title'    => $title,
 				'children' => $children,
 			);
@@ -469,6 +500,68 @@ function jha_should_show_course_title( $post_id ) {
  */
 function jha_course_page_is_hidden_from_menu( $post_id ) {
 	return '1' === get_post_meta( absint( $post_id ), '_jha_course_hide_from_menu', true );
+}
+
+/**
+ * Whether a node array represents a menu-only course menu item.
+ *
+ * @param array $node Menu or lesson tree node.
+ * @return bool
+ */
+function jha_is_course_menu_tree_menu_node( $node ) {
+	if ( ! is_array( $node ) || empty( $node['token'] ) ) {
+		return false;
+	}
+
+	$token = sanitize_key( (string) $node['token'] );
+	$type  = isset( $node['type'] ) ? sanitize_key( (string) $node['type'] ) : '';
+
+	return 'menu' === $type || 0 === strpos( $token, 'menu-' );
+}
+
+/**
+ * Get menu-only item tokens hidden from the frontend course menu.
+ *
+ * @param int $course_root_id Top-level course page ID.
+ * @return string[]
+ */
+function jha_get_hidden_course_menu_item_tokens( $course_root_id ) {
+	$course_root_id = absint( $course_root_id );
+
+	if ( ! $course_root_id ) {
+		return array();
+	}
+
+	$raw = get_post_meta( $course_root_id, '_jha_course_hidden_menu_items', true );
+
+	if ( ! is_string( $raw ) || '' === $raw ) {
+		return array();
+	}
+
+	return array_values(
+		array_unique(
+			array_filter(
+				array_map( 'sanitize_key', explode( ',', $raw ) )
+			)
+		)
+	);
+}
+
+/**
+ * Whether a menu-only item is hidden from the frontend course menu.
+ *
+ * @param string $token Menu-only item token.
+ * @param int    $course_root_id Top-level course page ID.
+ * @return bool
+ */
+function jha_course_menu_item_is_hidden( $token, $course_root_id ) {
+	$token = sanitize_key( (string) $token );
+
+	if ( '' === $token ) {
+		return false;
+	}
+
+	return in_array( $token, jha_get_hidden_course_menu_item_tokens( $course_root_id ), true );
 }
 
 /**

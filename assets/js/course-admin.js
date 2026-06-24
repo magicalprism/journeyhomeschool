@@ -6,6 +6,7 @@
 		var $input = $('#jha-course-child-order');
 		var $trashInput = $('#jha-course-child-trash');
 		var $hiddenInput = $('#jha-course-hidden-lessons');
+		var $hiddenMenuInput = $('#jha-course-hidden-menu-items');
 		var $newPagesInput = $('#jha-course-new-child-pages');
 		var $newTitleInput = $('#jha-course-new-child-title');
 		var $newMenuLabelInput = $('#jha-course-new-child-menu-label');
@@ -32,7 +33,6 @@
 		var wasSavingPost = false;
 		var isAddingLesson = false;
 		var lessonOrderDirty = false;
-		var lessonManagerSaveSyncArmed = false;
 		var saveButtonSelector = [
 			'.editor-post-publish-button',
 			'.editor-post-publish-button__button',
@@ -431,7 +431,7 @@
 			}
 
 			var pageIds = $list
-				.find('.jha-course-child-order-item.is-hidden-from-menu')
+				.find('.jha-course-child-order-item.is-hidden-from-menu:not(.is-menu-only)')
 				.map(function () {
 					return String($(this).attr('data-page-id') || '');
 				})
@@ -439,6 +439,22 @@
 				.filter(Boolean);
 
 			$hiddenInput.val(pageIds.join(','));
+		}
+
+		function updateHiddenMenuInput() {
+			if (!$hiddenMenuInput.length) {
+				return;
+			}
+
+			var tokens = $list
+				.find('.jha-course-child-order-item.is-menu-only.is-hidden-from-menu')
+				.map(function () {
+					return String($(this).attr('data-page-token') || '');
+				})
+				.get()
+				.filter(Boolean);
+
+			$hiddenMenuInput.val(tokens.join(','));
 		}
 
 		function updateNewPagesInput() {
@@ -525,6 +541,10 @@
 		}
 
 		function getHiddenFieldValue() {
+			if ($list.length) {
+				updateHiddenInput();
+			}
+
 			if ($hiddenInput.length) {
 				return $hiddenInput.val() || '';
 			}
@@ -534,7 +554,7 @@
 			}
 
 			return $list
-				.find('.jha-course-child-order-item.is-hidden-from-menu')
+				.find('.jha-course-child-order-item.is-hidden-from-menu:not(.is-menu-only)')
 				.map(function () {
 					return String($(this).attr('data-page-id') || '');
 				})
@@ -543,8 +563,35 @@
 				.join(',');
 		}
 
+		function getHiddenMenuFieldValue() {
+			if ($list.length) {
+				updateHiddenMenuInput();
+			}
+
+			if ($hiddenMenuInput.length) {
+				return $hiddenMenuInput.val() || '';
+			}
+
+			if (!$list.length) {
+				return '';
+			}
+
+			return $list
+				.find('.jha-course-child-order-item.is-menu-only.is-hidden-from-menu')
+				.map(function () {
+					return String($(this).attr('data-page-token') || '');
+				})
+				.get()
+				.filter(Boolean)
+				.join(',');
+		}
+
+		function hasLessonManagerTrashPending() {
+			return Boolean($list.find('.jha-course-child-order-item.is-marked-for-trash').length);
+		}
+
 		function shouldSyncLessonManagerToEditor() {
-			return hasPendingLessonManagerChanges() || lessonOrderDirty;
+			return hasPendingLessonManagerChanges() || lessonOrderDirty || hasLessonManagerTrashPending();
 		}
 
 		function updateLessonManagerHiddenFields() {
@@ -552,6 +599,7 @@
 				updateOrderInput();
 				updateTrashInput();
 				updateHiddenInput();
+				updateHiddenMenuInput();
 			}
 
 			updateNewPagesInput();
@@ -572,10 +620,6 @@
 				return;
 			}
 
-			if (forceSync && lessonManagerSaveSyncArmed) {
-				return;
-			}
-
 			if (!window.wp || !wp.data || !wp.data.dispatch) {
 				return;
 			}
@@ -586,22 +630,15 @@
 				return;
 			}
 
-			if (forceSync) {
-				lessonManagerSaveSyncArmed = true;
-			}
-
 			wp.data.dispatch('core/editor').editPost({
 				meta: {
 					_jha_course_lesson_tree: JSON.stringify(serializeList($list)),
 					_jha_course_new_child_pages: JSON.stringify(newPages),
 					_jha_course_child_trash: getTrashFieldValue(),
-					_jha_course_hidden_lessons: getHiddenFieldValue()
+					_jha_course_hidden_lessons: getHiddenFieldValue(),
+					_jha_course_hidden_menu_items: getHiddenMenuFieldValue()
 				}
 			});
-		}
-
-		function resetLessonManagerSaveSyncArm() {
-			lessonManagerSaveSyncArmed = false;
 		}
 
 		function escapeHtml(value) {
@@ -653,6 +690,12 @@
 						'<span class="jha-course-child-order-title">' + safeDisplayLabel + '</span>' +
 						'<span class="jha-course-child-order-post-title">' + (createPage ? 'New page title: ' + safeTitle : 'Menu-only parent, no page created') + '</span>' +
 						'<span class="jha-course-child-order-hidden-label">Hidden from menu</span>' +
+						(!createPage ?
+							'<button type="button" class="button-link jha-course-child-action jha-course-child-hide" aria-label="Hide from course menu" title="Hide from course menu">' +
+								'<span class="dashicons dashicons-hidden" aria-hidden="true"></span>' +
+								'<span class="screen-reader-text">Hide from course menu</span>' +
+							'</button>' :
+							'') +
 						'<button type="button" class="button-link-delete jha-course-child-action jha-course-child-delete" aria-label="Remove new unsaved lesson" title="Remove new unsaved lesson">' +
 							'<span class="dashicons dashicons-trash" aria-hidden="true"></span>' +
 							'<span class="screen-reader-text">Remove new unsaved lesson</span>' +
@@ -744,6 +787,7 @@
 				isMarked ? 'dashicons-undo' : 'dashicons-trash',
 				isMarked ? 'Undo move to Trash' : 'Move page to Trash'
 			);
+			markLessonManagerDirty();
 			syncLessonManagerFields(true);
 			updateLessonSearch();
 		});
@@ -758,6 +802,7 @@
 				isHidden ? 'dashicons-visibility' : 'dashicons-hidden',
 				isHidden ? 'Show in course menu' : 'Hide from course menu'
 			);
+			markLessonManagerDirty();
 			syncLessonManagerFields(true);
 			updateLessonSearch();
 		});
@@ -805,16 +850,19 @@
 		});
 
 		$('form#post').on('submit', function () {
-			if (shouldSyncLessonManagerToEditor()) {
+			if ($list.length) {
 				syncLessonManagerFields(true);
 				armLessonManagerReloadAfterSave();
 			}
 		});
 
 		$(document).on('click', saveButtonSelector, function () {
-			if (shouldSyncLessonManagerToEditor()) {
+			if ($list.length) {
 				syncLessonManagerFields(true);
-				armLessonManagerReloadAfterSave();
+
+				if (shouldSyncLessonManagerToEditor()) {
+					armLessonManagerReloadAfterSave();
+				}
 			}
 		});
 
@@ -829,13 +877,8 @@
 
 				if (wasSavingPost && !saving && !autosaving && lessonSaveReloadArmed) {
 					lessonSaveReloadArmed = false;
-					resetLessonManagerSaveSyncArm();
 					reloadLessonManagerEditor();
 					return;
-				}
-
-				if (wasSavingPost && !saving && !autosaving) {
-					resetLessonManagerSaveSyncArm();
 				}
 
 				wasSavingPost = saving;
@@ -851,13 +894,13 @@
 				hookName,
 				'jha/course-lesson-sync',
 				function () {
-					if (isAutosavingEditor() || !shouldSyncLessonManagerToEditor()) {
+					if (isAutosavingEditor() || !$list.length) {
 						return;
 					}
 
 					syncLessonManagerFields(true);
 
-					if (hasPendingLessonManagerChanges()) {
+					if (hasPendingLessonManagerChanges() || hasLessonManagerTrashPending()) {
 						armLessonManagerReloadAfterSave();
 					}
 				},
