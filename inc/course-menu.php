@@ -13,6 +13,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
+ * Normalize a post ID from mixed editor/query values.
+ *
+ * @param mixed $post_id Post ID or post object.
+ * @return int
+ */
+function jha_normalize_post_id( $post_id ) {
+	if ( $post_id instanceof WP_Post ) {
+		return absint( $post_id->ID );
+	}
+
+	return absint( $post_id );
+}
+
+/**
  * Get the top-level course parent for the current page tree.
  *
  * If the page has no parent, it is the course parent. If it is nested, the
@@ -22,7 +36,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @return int Top-level course parent ID.
  */
 function jha_get_course_parent_id( $post_id ) {
-	$post_id = absint( $post_id );
+	$post_id = jha_normalize_post_id( $post_id );
 
 	if ( ! $post_id ) {
 		return 0;
@@ -53,7 +67,7 @@ function jha_get_course_template_slug() {
  * @return bool
  */
 function jha_page_has_course_template( $post_id ) {
-	$post_id = absint( $post_id );
+	$post_id = jha_normalize_post_id( $post_id );
 
 	if ( ! $post_id ) {
 		return false;
@@ -73,7 +87,7 @@ function jha_page_has_course_template( $post_id ) {
  * @return bool
  */
 function jha_page_is_in_course_template_system( $post_id ) {
-	$post_id = absint( $post_id );
+	$post_id = jha_normalize_post_id( $post_id );
 
 	if ( ! $post_id ) {
 		return false;
@@ -464,21 +478,16 @@ function jha_course_page_is_hidden_from_menu( $post_id ) {
  * @return bool
  */
 function jha_page_owns_course_menu_tree( $post_id ) {
-	$post_id = absint( $post_id );
+	$post_id        = jha_normalize_post_id( $post_id );
+	$course_root_id = jha_get_course_parent_id( $post_id );
 
-	if ( ! $post_id ) {
+	if ( ! $post_id || $post_id !== $course_root_id ) {
 		return false;
 	}
 
 	$menu_tree = get_post_meta( $post_id, '_jha_course_menu_tree', true );
 
-	if ( is_string( $menu_tree ) && '' !== $menu_tree && '[]' !== $menu_tree ) {
-		return true;
-	}
-
-	$lesson_tree = get_post_meta( $post_id, '_jha_course_lesson_tree', true );
-
-	return is_string( $lesson_tree ) && '' !== $lesson_tree && '[]' !== $lesson_tree;
+	return is_string( $menu_tree ) && '' !== $menu_tree && '[]' !== $menu_tree;
 }
 
 /**

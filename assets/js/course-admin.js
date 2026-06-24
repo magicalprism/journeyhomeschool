@@ -31,6 +31,8 @@
 		var lessonSaveReloadArmed = false;
 		var wasSavingPost = false;
 		var isAddingLesson = false;
+		var lessonOrderDirty = false;
+		var lessonManagerSaveSyncArmed = false;
 		var saveButtonSelector = [
 			'.editor-post-publish-button',
 			'.editor-post-publish-button__button',
@@ -541,7 +543,11 @@
 				.join(',');
 		}
 
-		function syncLessonManagerFields(forceSync) {
+		function shouldSyncLessonManagerToEditor() {
+			return hasPendingLessonManagerChanges() || lessonOrderDirty;
+		}
+
+		function updateLessonManagerHiddenFields() {
 			if ($list.length) {
 				updateOrderInput();
 				updateTrashInput();
@@ -549,12 +555,24 @@
 			}
 
 			updateNewPagesInput();
+		}
+
+		function syncLessonManagerFields(forceSync) {
+			updateLessonManagerHiddenFields();
 
 			if (!shouldShowCourseSettings() || !$list.length) {
 				return;
 			}
 
+			if (!forceSync && !shouldSyncLessonManagerToEditor()) {
+				return;
+			}
+
 			if (!forceSync && isAutosavingEditor()) {
+				return;
+			}
+
+			if (forceSync && lessonManagerSaveSyncArmed) {
 				return;
 			}
 
@@ -568,6 +586,10 @@
 				return;
 			}
 
+			if (forceSync) {
+				lessonManagerSaveSyncArmed = true;
+			}
+
 			wp.data.dispatch('core/editor').editPost({
 				meta: {
 					_jha_course_lesson_tree: JSON.stringify(serializeList($list)),
@@ -576,6 +598,10 @@
 					_jha_course_hidden_lessons: getHiddenFieldValue()
 				}
 			});
+		}
+
+		function resetLessonManagerSaveSyncArm() {
+			lessonManagerSaveSyncArmed = false;
 		}
 
 		function escapeHtml(value) {
@@ -592,6 +618,10 @@
 				.attr('class', 'dashicons ' + iconClass);
 
 			$button.find('.screen-reader-text').text(label);
+		}
+
+		function markLessonManagerDirty() {
+			lessonOrderDirty = true;
 		}
 
 		function addPendingLesson(title, menuLabel, createPage) {
@@ -666,9 +696,18 @@
 							items: '> .jha-course-child-order-item:not(.is-marked-for-trash)',
 							placeholder: 'jha-course-child-order-placeholder',
 							tolerance: 'pointer',
-							update: syncLessonManagerFields,
-							receive: syncLessonManagerFields,
-							stop: syncLessonManagerFields
+							update: function () {
+								markLessonManagerDirty();
+								syncLessonManagerFields(true);
+							},
+							receive: function () {
+								markLessonManagerDirty();
+								syncLessonManagerFields(true);
+							},
+							stop: function () {
+								markLessonManagerDirty();
+								syncLessonManagerFields(true);
+							}
 						});
 				});
 		}
@@ -682,14 +721,15 @@
 			if ($item.hasClass('is-new-lesson')) {
 				delete newPages[token];
 				$item.remove();
-				syncLessonManagerFields();
+				syncLessonManagerFields(true);
 				updateLessonSearch();
 				return;
 			}
 
 			if ($item.hasClass('is-menu-only')) {
 				$item.remove();
-				syncLessonManagerFields();
+				markLessonManagerDirty();
+				syncLessonManagerFields(true);
 				updateLessonSearch();
 				return;
 			}
@@ -704,7 +744,7 @@
 				isMarked ? 'dashicons-undo' : 'dashicons-trash',
 				isMarked ? 'Undo move to Trash' : 'Move page to Trash'
 			);
-			syncLessonManagerFields();
+			syncLessonManagerFields(true);
 			updateLessonSearch();
 		});
 
@@ -718,7 +758,7 @@
 				isHidden ? 'dashicons-visibility' : 'dashicons-hidden',
 				isHidden ? 'Show in course menu' : 'Hide from course menu'
 			);
-			syncLessonManagerFields();
+			syncLessonManagerFields(true);
 			updateLessonSearch();
 		});
 
@@ -757,7 +797,7 @@
 
 		initSortable($(document));
 		keepCourseSettingsOpen();
-		syncLessonManagerFields();
+		updateLessonManagerHiddenFields();
 		updateLessonSearch();
 
 		$(document).on('click', '#jha-course-settings .postbox-header, #jha-course-settings .hndle', function () {
@@ -765,13 +805,17 @@
 		});
 
 		$('form#post').on('submit', function () {
-			syncLessonManagerFields(true);
-			armLessonManagerReloadAfterSave();
+			if (shouldSyncLessonManagerToEditor()) {
+				syncLessonManagerFields(true);
+				armLessonManagerReloadAfterSave();
+			}
 		});
 
 		$(document).on('click', saveButtonSelector, function () {
-			syncLessonManagerFields(true);
-			armLessonManagerReloadAfterSave();
+			if (shouldSyncLessonManagerToEditor()) {
+				syncLessonManagerFields(true);
+				armLessonManagerReloadAfterSave();
+			}
 		});
 
 		if (window.wp && wp.data && wp.data.subscribe) {
@@ -785,8 +829,13 @@
 
 				if (wasSavingPost && !saving && !autosaving && lessonSaveReloadArmed) {
 					lessonSaveReloadArmed = false;
+					resetLessonManagerSaveSyncArm();
 					reloadLessonManagerEditor();
 					return;
+				}
+
+				if (wasSavingPost && !saving && !autosaving) {
+					resetLessonManagerSaveSyncArm();
 				}
 
 				wasSavingPost = saving;
@@ -802,7 +851,7 @@
 				hookName,
 				'jha/course-lesson-sync',
 				function () {
-					if (isAutosavingEditor()) {
+					if (isAutosavingEditor() || !shouldSyncLessonManagerToEditor()) {
 						return;
 					}
 
@@ -812,7 +861,7 @@
 						armLessonManagerReloadAfterSave();
 					}
 				},
-				1
+				99
 			);
 		}
 

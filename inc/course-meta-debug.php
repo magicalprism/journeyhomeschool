@@ -134,7 +134,7 @@ function jha_lesson_meta_debug_filter_post_meta_change( $check, $object_id, $met
 		return $check;
 	}
 
-	$object_id = absint( $object_id );
+	$object_id = jha_normalize_post_id( $object_id );
 
 	if ( ! $object_id || ! jha_lesson_meta_debug_should_log_meta_key( (string) $meta_key, $object_id ) ) {
 		return $check;
